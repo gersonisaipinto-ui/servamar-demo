@@ -74,6 +74,15 @@
      root.replaceChildren();
      line(root,'Almacenamiento: '+d.storage+' · Dispositivos inscritos: '+d.subscribers+'.');
      line(root,d.delivery_note);
+     const checks=Array.isArray(d.checks)?d.checks:[];
+     line(root,'Revisiones diarias registradas: '+checks.length+'.');
+     if(!checks.length)line(root,'Todavía no hay revisiones diarias registradas.');
+     const labels={sent:'Enviado al proveedor',failed:'Fallo de entrega',no_alerts:'Sin vencimientos',already_sent:'Avisos enviados anteriormente'};
+     for(const run of checks.slice(0,15)){
+       line(root,formatDateTime(run.checked_at)+' · '+(labels[run.status]||run.status)+
+         ' · '+run.alerts+' recordatorio(s) · '+run.accepted+' aceptados · '+run.failed+' fallidos.');
+     }
+     line(root,'Historial de envíos completados:');
      if(!d.history.length)line(root,'Todavía no hay envíos diarios registrados.');
      for(const item of d.history){
        line(root,formatDateTime(item.registered_at)+' · '+formatDate(item.date)+' · '+item.status+
