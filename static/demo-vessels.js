@@ -22,6 +22,12 @@
   $('dbdemo-save').textContent=r?'Guardar modificaciones':'Guardar nuevo registro';
   for(const k of fields){const v=r?r[k]:(k==='stage'?'ingreso':'');$('dbdemo-'+k).value=(k==='entry_date'||k==='movement_date')?fmt(v).replace('—',''):(v||'');}
   $('dbdemo-cancel').hidden=!r;
+  $('dbdemo-movement-panel').hidden=!r;
+  $('dbdemo-movement-history').replaceChildren();
+  if(r){
+    $('dbdemo-movement-selected').textContent=r.registration+' · '+r.vessel_name+' · etapa actual: '+r.stage+' · vencimiento: '+fmt(r.due_date);
+    $('dbdemo-movement-event').value=fmt(r.movement_date);
+  }
   status(r?'Editando '+r.registration+'.':'Solo datos inventados. Este laboratorio no modifica la base operativa.');
  };
  const render=()=>{
@@ -85,6 +91,36 @@
     else{await api('/api/demo/vessels','POST',obj);status('Nuevo registro ficticio guardado en PostgreSQL.');}
     setRecord(null);await window.servamarDemoRefresh();
   }catch(e){status(e.message,true);}
+ };
+ window.servamarDemoMove=async()=>{
+   const msg=$('dbdemo-movement-message');
+   try{
+     if(!editing)throw Error('Selecciona primero una embarcación ficticia.');
+     const data={kind:$('dbdemo-movement-kind').value,
+       event_date:iso($('dbdemo-movement-event').value),version:editing.version};
+     if(!confirm('¿Registrar movimiento '+data.kind+' del '+editing.registration+'? Solo afecta el laboratorio.'))return;
+     const r=await api('/api/demo/vessels/'+editing.id+'/movement','POST',data);
+     msg.textContent='Movimiento guardado. Nuevo estado: '+r.stage+' · vencimiento: '+fmt(r.due_date)+'.';
+     const selectedId=editing.id;
+     await window.servamarDemoRefresh();
+     const updated=records.find(v=>v.id===selectedId);
+     if(updated)setRecord(updated);
+     await window.servamarDemoMovementHistory();
+     msg.textContent='Movimiento registrado correctamente. '+(r.due_date?'Vencimiento: '+fmt(r.due_date):'Permiso cerrado.');
+   }catch(e){msg.textContent='Error: '+e.message;}
+ };
+ window.servamarDemoMovementHistory=async()=>{
+   const root=$('dbdemo-movement-history');root.replaceChildren();
+   try{
+     if(!editing)throw Error('Selecciona un registro ficticio');
+     const j=await api('/api/demo/vessels/'+editing.id+'/movements');
+     if(!j.items.length){root.textContent='Sin movimientos posteriores al ingreso.';return;}
+     for(const m of j.items){
+       const p=document.createElement('p');
+       p.textContent=fmt(m.event_date)+' · '+m.kind+' · '+m.stage_before+' → '+m.stage_after+' · vencimiento '+fmt(m.due_after);
+       root.append(p);
+     }
+   }catch(e){root.textContent=e.message;}
  };
  window.servamarDemoAudit=async()=>{
   const target=$('dbdemo-audit');target.replaceChildren();
