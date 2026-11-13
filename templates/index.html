@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SERVAMAR | Control de embarcaciones</title><link rel="stylesheet" href="/static/style.css?v=58"></head>
-<body>{% if demo_mode %}<aside style="position:sticky;top:0;z-index:9999;background:#fff3cd;color:#493b12;padding:12px 16px;text-align:center;font-weight:700;border-bottom:2px solid #e6bc40">PRUEBA GRATUITA EN RENDER · DATOS FICTICIOS · SOLO LECTURA · LOS CAMBIOS NO SE GUARDAN</aside>{% endif %}<header class="topbar"><div class="brand"><div class="mark" aria-hidden="true">⚓</div><div><small>SERVAMAR · CONTROL DE EXPEDIENTES</small><h1>Embarcaciones</h1></div></div><div class="status"><span id="servamar-version">V40 · uso local</span></div></header>
+<body>{% if demo_mode %}<aside style="position:sticky;top:0;z-index:9999;background:#fff3cd;color:#493b12;padding:12px 16px;text-align:center;font-weight:700;border-bottom:2px solid #e6bc40">PRUEBA GRATUITA · EXPEDIENTES OPERATIVOS SOLO LECTURA · LABORATORIO POSTGRESQL EDITABLE (DATOS FICTICIOS)</aside>{% endif %}<header class="topbar"><div class="brand"><div class="mark" aria-hidden="true">⚓</div><div><small>SERVAMAR · CONTROL DE EXPEDIENTES</small><h1>Embarcaciones</h1></div></div><div class="status"><span id="servamar-version">V40 · uso local</span></div></header>
 <main>
 <nav class="tabs" aria-label="Secciones principales">
 <button type="button" class="tab active" data-tab="inicio" onclick="showTab('inicio')">Inicio</button>
@@ -9,6 +9,7 @@
 <button type="button" class="tab" data-tab="avisos" onclick="showTab('avisos')">Avisos y respaldo</button>
 <button type="button" class="tab" data-tab="exportar" onclick="showTab('exportar')">Descargar control</button>
 <button type="button" class="tab" data-tab="excel" onclick="showTab('excel')">Importar Excel</button>
+{% if demo_mode %}<button type="button" class="tab" data-tab="bdpruebas" onclick="showTab('bdpruebas');servamarDemoRefresh()">Base de datos de prueba</button>{% endif %}
 </nav>
 <section class="mobile-alarm-panel" id="mobile-alarm-panel" aria-label="Alarmas de SERVAMAR">
  <div class="mobile-alarm-heading"><strong>🔔 Alarmas de hoy</strong><span id="android-alarm-count" class="alarm-count" aria-live="polite">—</span></div>
@@ -65,5 +66,35 @@
 <section id="tab-excel" class="tab-panel" hidden>
 <section class="panel"><h2>Actualizar desde Excel</h2><p class="muted">Compatible con el control original, el archivo de depósito y la base consolidada. La importación preserva cambios locales, crea un respaldo y no valida fechas automáticamente.</p>
 <div class="actions"><input type="file" id="importfile" accept=".xlsx"><button class="secondary" onclick="previewImport()">Verificar archivo</button><button id="importcommit" disabled onclick="commitImport()">Importar cambios</button></div><pre id="importstatus" class="muted"></pre></section></section>
+
+{% if demo_mode %}
+<section id="tab-bdpruebas" class="tab-panel" hidden>
+<section class="panel">
+<h2>Laboratorio de base de datos — PostgreSQL</h2>
+<p class="muted">Esta sección permite crear, modificar y eliminar solamente embarcaciones ficticias. Se guarda en una tabla PostgreSQL de prueba, completamente separada de la base operativa y de los avisos reales. No se permiten números de registro reales: usa el prefijo DEMO-.</p>
+<p><strong>Atención:</strong> PostgreSQL Free vence el 13/12/2026. No introduzcas información de clientes, documentos ni expedientes auténticos. El cálculo de fechas es orientativo, no una autorización aduanera.</p>
+<div id="dbdemo-form">
+<h3 id="dbdemo-title">Nuevo registro ficticio</h3>
+<div class="grid">
+<label class="field">Número de registro ficticio<input id="dbdemo-registration" maxlength="29" placeholder="DEMO-001" autocomplete="off"></label>
+<label class="field">Embarcación ficticia<input id="dbdemo-vessel_name" maxlength="100" placeholder="EMBARCACIÓN DE PRUEBA" autocomplete="off"></label>
+<label class="field">Capitán ficticio<input id="dbdemo-captain" maxlength="100" placeholder="CAPITÁN DE PRUEBA" autocomplete="off"></label>
+<label class="field">Etapa<select id="dbdemo-stage"><option value="ingreso">Ingreso 90 días</option><option value="ampliacion">Ampliación (12 meses desde ingreso)</option><option value="deposito">Depósito 12 meses</option><option value="salida">Salida temporal 90 días</option><option value="cierre">Cierre del permiso</option></select></label>
+<label class="field">Fecha de ingreso (dd/mm/yyyy)<input id="dbdemo-entry_date" placeholder="13/11/2026" maxlength="10" inputmode="numeric"></label>
+<label class="field">Fecha del movimiento (dd/mm/yyyy)<input id="dbdemo-movement_date" placeholder="13/11/2026" maxlength="10" inputmode="numeric"></label>
+<label class="field">Observaciones ficticias<input id="dbdemo-notes" maxlength="300" placeholder="Solo datos de prueba"></label>
+</div>
+<div class="actions">
+<button id="dbdemo-save" type="button" onclick="servamarDemoSave()">Guardar nuevo registro</button>
+<button id="dbdemo-cancel" class="secondary" type="button" onclick="servamarDemoReset()" hidden>Cancelar edición</button>
+<button class="secondary" type="button" onclick="servamarDemoRefresh()">Actualizar lista</button>
+<button class="secondary" type="button" onclick="servamarDemoAudit()">Ver historial de cambios</button>
+</div>
+<p id="dbdemo-status" class="muted" aria-live="polite">Laboratorio independiente de la base operativa.</p>
+</div>
+<div class="tablewrap"><p id="dbdemo-count" class="muted">Cargando registros...</p><div id="dbdemo-list"></div></div>
+<div id="dbdemo-audit" class="muted" aria-live="polite"></div>
+</section></section>
+{% endif %}
 <section id="detail" class="panel detail-panel" hidden></section>
-</main><footer>Fechas en dd/mm/yyyy · Los avisos a clientes requieren correo válido, consentimiento y confirmación del envío.</footer><script src="/static/app.js?v=58"></script><script src="/static/date-inputs.js?v=58" defer></script><script src="/static/push-demo.js?v=64" defer></script></body></html>
+</main><footer>Fechas en dd/mm/yyyy · Los avisos a clientes requieren correo válido, consentimiento y confirmación del envío.</footer><script src="/static/app.js?v=58"></script><script src="/static/date-inputs.js?v=58" defer></script><script src="/static/push-demo.js?v=64" defer></script>{% if demo_mode %}<script src="/static/demo-vessels.js?v=1" defer></script>{% endif %}</body></html>
