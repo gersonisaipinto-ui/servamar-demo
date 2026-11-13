@@ -56,7 +56,8 @@ class PushAuditTests(unittest.TestCase):
         first = {"accepted": 2, "failed": 0, "skipped": 0, "subscribers": 2}
         second = {"accepted": 0, "failed": 0, "skipped": 2, "subscribers": 2}
         third = {"accepted": 1, "failed": 0, "skipped": 2, "subscribers": 3}
-        with patch.object(app, "planned_alerts_for_day", return_value=plan), \
+        with app.app.app_context(), \
+             patch.object(app, "planned_alerts_for_day", return_value=plan), \
              patch.object(push_demo, "send_demo", side_effect=[first,second,third]) as sender:
             a,code1=push_demo.daily_check()
             b,code2=push_demo.daily_check()
