@@ -72,7 +72,7 @@ def basic_protection():
   return jsonify(error='HTTPS obligatorio'),403
  if request.path == '/healthz' and not LAN_MODE:
   return None
- if DEMO_MODE and request.method not in ('GET','HEAD','OPTIONS') and request.path not in ('/api/push/subscribe','/api/push/unsubscribe','/api/push/test'):
+ if DEMO_MODE and request.method not in ('GET','HEAD','OPTIONS') and request.path not in ('/api/push/subscribe','/api/push/unsubscribe','/api/push/test','/api/push/daily-check'):
   return jsonify(error='DEMO GRATUITA: solo lectura. No se permiten modificaciones, importaciones ni envíos.'),403
  if LAN_MODE:
   from ipaddress import ip_address
@@ -2056,6 +2056,9 @@ else:
      start=(date.today()-timedelta(days=90-delta)).isoformat()
      end=(date.today()+timedelta(days=delta)).isoformat()
      c.execute("INSERT INTO vessels(declaration,name,captain,stage,start_date,expiry_date,validated,notes) VALUES(?,?,?,?,?,?,?,?)",(decl,name,cap,'ingreso',start,end,1,'DATOS FICTICIOS: PRUEBA GRATUITA'))
+   # Solo fechas ficticias: vincular recordatorios sin alterar registros reales.
+   for sample in c.execute("SELECT id FROM vessels WHERE declaration LIKE 'ST-DEMO-%'").fetchall():
+    c.executemany("INSERT OR IGNORE INTO alert_settings(vessel_id,days_before,enabled) VALUES(?,?,1)",[(sample['id'],30),(sample['id'],15),(sample['id'],1)])
  else:
   accept_historical_records_once()
   reconcile_historical_temporary_dates_once()
