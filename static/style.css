@@ -1,0 +1,159 @@
+:root{font-family:Inter,system-ui,Arial,sans-serif;color:#173047;background:#f3f7fb}*{box-sizing:border-box}body{margin:0}header{padding:28px max(22px,calc((100vw - 1160px)/2));background:linear-gradient(110deg,#123047,#176176);color:white;display:flex;align-items:center;justify-content:space-between;gap:20px}header h1{margin:4px 0;font-size:30px}header p{margin:5px 0;color:#d2e7ed}small{letter-spacing:.1em}main{max-width:1160px;margin:24px auto;padding:0 18px}.status{background:#ffffff21;padding:12px 16px;border-radius:12px;font-size:13px}.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px}.stat,.panel{background:white;border:1px solid #e0e9ef;border-radius:14px;box-shadow:0 3px 12px #10203008}.stat{padding:18px}.stat b{font-size:28px;display:block;margin:4px 0}.stat span{font-size:12px;color:#576d79}.panel{padding:20px;margin-bottom:20px}.toolbar{display:flex;justify-content:space-between;align-items:center;gap:20px}.toolbar h2{margin:0;font-size:21px}.toolbar p,#resultmeta{color:#6a7f8d;font-size:13px}input,select,textarea{border:1px solid #c9d6df;border-radius:9px;font:inherit;padding:10px;background:white;max-width:100%}#search{width:360px}.tablewrap{overflow:auto}table{width:100%;border-collapse:collapse}th{text-align:left;font-size:12px;color:#667987}td,th{padding:12px 9px;border-bottom:1px solid #e8edf1}td{font-size:13px}button{cursor:pointer;border:0;border-radius:9px;background:#176176;color:white;padding:10px 14px;font-weight:600}button.secondary{background:#e8f0f4;color:#145269}button:hover{filter:brightness(.95)}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.field{display:flex;flex-direction:column;gap:5px;font-size:13px}.field input,.field select{width:100%}.field.full{grid-column:1/-1}h3{margin:20px 0 10px}label.check{display:flex;gap:8px;align-items:center}.actions{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}ul.history{padding-left:20px;max-height:320px;overflow:auto}ul.history li{padding:6px 0;font-size:13px}.muted{color:#71828f}.alert{padding:10px 12px;background:#fff3d6;border-radius:8px;font-size:13px;margin:12px 0}.success{background:#e8f7ee}.error{background:#ffe7e4}footer{max-width:1160px;margin:25px auto;color:#687e88;font-size:12px;padding:0 18px}@media(max-width:760px){header{display:block}header h1{font-size:24px}.status{margin-top:12px;display:inline-block}.stats{grid-template-columns:repeat(2,1fr)}.grid{grid-template-columns:1fr}.toolbar{display:block}#search{width:100%}.stat b{font-size:23px}}
+
+.button{display:inline-block;text-decoration:none;padding:10px 14px;border-radius:7px;border:1px solid #adc1cc;color:#17354c;background:#f8fbfd;font-weight:600}.button:hover{background:#edf5f8}
+
+.search-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:18px}.search-grid input{width:100%}@media(max-width:760px){.search-grid{grid-template-columns:1fr}}
+
+/* V8 — pantalla principal compacta y navegación por secciones */
+.topbar{padding-top:14px;padding-bottom:14px;min-height:76px}.brand{display:flex;align-items:center;gap:12px}.brand h1{font-size:23px;margin:1px 0}.brand small{font-size:10px}.mark{background:#ffffff26;border:1px solid #ffffff44;width:40px;height:40px;display:grid;place-items:center;border-radius:12px;font-size:23px}.topbar .status{padding:8px 11px;font-size:11px}main{margin-top:15px}.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 16px;padding:5px;background:#e7eef3;border-radius:12px}.tab{background:transparent;color:#456173;font-size:13px;padding:10px 15px;flex:0 1 auto}.tab.active{background:#fff;color:#0d536c;box-shadow:0 1px 5px #20304018}.tab-panel[hidden],#detail[hidden]{display:none!important}.welcome{display:flex;justify-content:space-between;align-items:center;margin:0 0 14px;gap:12px}.welcome h2{margin:0;font-size:22px}.welcome p{margin:4px 0 0;color:#677e8b;font-size:13px}.stats{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:14px}.stat{padding:12px 16px}.stat b{font-size:23px;margin:2px 0}.panel{padding:17px;margin-bottom:14px}.panel.compact h3{font-size:18px;margin:0}.panel.compact .toolbar{margin-bottom:5px}.panel.compact .toolbar a{font-size:12px}.small-btn{padding:8px 11px}.help,.detail-fold{border:1px solid #e1ebf1;border-radius:9px;margin-top:12px;padding:10px 13px}.help summary,.detail-fold summary{cursor:pointer;font-weight:600;color:#176176}.help p{font-size:13px;color:#677e8b}.detail-panel{margin-top:8px}.tablewrap{max-height:65vh}.panel h2{margin-top:0}.search-grid{grid-template-columns:repeat(3,minmax(0,1fr))}pre{white-space:pre-wrap;overflow-wrap:anywhere}
+@media(max-width:760px){.topbar{padding:14px 18px}.brand h1{font-size:20px}.topbar .status{margin:9px 0 0}.tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.tab{padding:10px 6px}.stats{grid-template-columns:repeat(3,minmax(0,1fr))}.stat{padding:10px}.stat span{font-size:10px}.stat b{font-size:20px}.welcome h2{font-size:19px}.search-grid{grid-template-columns:1fr}.panel{padding:14px}td,th{padding:9px 7px}}
+
+/* V30: Vista previa clara y separada del envío */
+.mail-preview{border:1px solid #b4cdd9;border-radius:12px;padding:16px;margin:12px 0;background:#f4f9fc;color:#17364b;}
+.mail-preview[hidden]{display:none;}
+.mail-preview .mail-body{white-space:pre-wrap;overflow-wrap:anywhere;max-height:330px;overflow:auto;background:#fff;border-radius:8px;padding:14px;font:inherit;}
+
+/* V33 — navegación accesible y reconocible por sección */
+.tabs{background:#edf2f7;gap:8px}
+.tabs .tab{border:2px solid transparent;font-weight:700;transition:filter .12s ease,box-shadow .12s ease}
+.tabs .tab[data-tab="inicio"]{background:#dbeafe;color:#1e40af}
+.tabs .tab[data-tab="nuevo"]{background:#dcfce7;color:#166534}
+.tabs .tab[data-tab="buscar"]{background:#ede9fe;color:#5b21b6}
+.tabs .tab[data-tab="avisos"]{background:#ffedd5;color:#9a3412}
+.tabs .tab[data-tab="exportar"]{background:#cffafe;color:#155e75}
+.tabs .tab[data-tab="excel"]{background:#fce7f3;color:#9d174d}
+.tabs .tab.active{border-color:currentColor;box-shadow:0 2px 7px #20304020}
+.tabs .tab:hover{filter:brightness(.96)}
+#tab-nuevo .panel{border-top:5px solid #22c55e}
+#tab-buscar .panel{border-top:5px solid #8b5cf6}
+#tab-avisos .panel{border-top:5px solid #f59e0b}
+#tab-exportar .panel{border-top:5px solid #06b6d4}
+#tab-excel .panel{border-top:5px solid #ec4899}
+#tab-inicio .panel{border-top:5px solid #3b82f6}
+#tab-nuevo button:not(.secondary){background:#166534}
+#tab-buscar button:not(.secondary){background:#6d28d9}
+#tab-avisos button:not(.secondary){background:#9a3412}
+#tab-exportar button:not(.secondary){background:#0e7490}
+#tab-excel button:not(.secondary){background:#9d174d}
+#detail button:not(.secondary){background:#176176}
+button.danger,button.danger.secondary{background:#b91c1c;color:#fff}
+button:focus-visible,.tab:focus-visible,input:focus-visible{outline:3px solid #172554;outline-offset:2px}
+.linked-permits{border-left:4px solid #8b5cf6;padding:1px 14px;background:#f8f6ff;border-radius:6px}
+@media(max-width:760px){.tabs{gap:6px}.tab{font-size:12px}}
+
+
+/* V34 — superficies por función y botones cromáticos diferenciados. */
+:root{--ink:#173047;--focus:#172554}
+#tab-inicio>.panel{background:#f1f7ff;border-color:#bfd8f7}
+#tab-inicio .stat:nth-child(1){background:#e0f2fe;border-color:#7dd3fc}
+#tab-inicio .stat:nth-child(2){background:#fff1f2;border-color:#fda4af}
+#tab-inicio .stat:nth-child(3){background:#fef3c7;border-color:#fcd34d}
+#tab-nuevo>.panel{background:#f0fdf4;border-color:#86efac}
+#tab-buscar>.panel{background:#f7f3ff;border-color:#c4b5fd}
+#tab-avisos>.panel{background:#fff7ed;border-color:#fdba74}
+#tab-exportar>.panel{background:#ecfeff;border-color:#67e8f9}
+#tab-excel>.panel{background:#fdf2f8;border-color:#f9a8d4}
+#detail.detail-panel{background:#f9fbfd;border:1px solid #cbd5e1;padding:20px}
+#detail .vessel-title-bar{background:#e3efff;border:1px solid #93c5fd;border-radius:12px;padding:16px;margin-bottom:12px}
+#detail .vessel-quick-actions{background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:12px;gap:10px}
+#detail .vessel-expiry-banner{background:#fff0c4;color:#70440e;border:1px solid #f5c86c;border-left:5px solid #d97706}
+#detail .vessel-section{padding:18px;border:1px solid;border-radius:13px;margin:14px 0}
+#detail .vessel-section>h3{margin:0 0 15px;padding-bottom:9px;border-bottom:1px solid currentColor;font-size:19px}
+#detail .vessel-info{background:#eef4ff;border-color:#a5b4fc;color:#1e3a8a}
+#detail .vessel-contact{background:#eafaf4;border-color:#86efac;color:#14532d}
+#detail .vessel-movement{background:#fff4e9;border-color:#fdba74;color:#7c2d12}
+#detail .vessel-info .field,#detail .vessel-contact .field,#detail .vessel-movement .field{color:#173047}
+#detail .vessel-section .muted{color:#52677b}
+#detail .linked-permits{background:#f1ecff;border-color:#8b5cf6;color:#4c1d95;margin-top:14px;padding:8px 13px}
+#detail details.detail-fold{border-radius:12px;padding:14px 17px;margin:13px 0;border:1px solid;overflow:hidden;color:#173047}
+#detail details.detail-fold summary{font-size:16px;font-weight:700}
+#detail .fold-departures{background:#f0fdfa;border-color:#5eead4}
+#detail .fold-departures summary{color:#115e59}
+#detail .fold-documents{background:#eef2ff;border-color:#a5b4fc}
+#detail .fold-documents summary{color:#3730a3}
+#detail .fold-history{background:#fff4e6;border-color:#fdba74}
+#detail .fold-history summary{color:#9a3412}
+#detail .fold-alerts{background:#fdf2f8;border-color:#f9a8d4}
+#detail .fold-alerts summary{color:#9d174d}
+#detail .fold-edits{background:#f3f4f6;border-color:#cbd5e1}
+#detail .fold-edits summary{color:#334155}
+#detail input,#detail textarea,#detail select,#tab-nuevo input,#tab-buscar input,#tab-exportar input{color:#173047;background:#fff}
+#detail input:focus-visible,#detail select:focus-visible,#detail textarea:focus-visible{outline:3px solid #2563eb;outline-offset:2px}
+/* Acción = color consistente; acciones destructivas siempre rojo. */
+button[onclick*="previewManualClientEmail"]{background:#0e7490!important;color:#fff!important}
+button[onclick*="saveDetails"]{background:#15803d!important;color:#fff!important}
+button[onclick*="saveEvent"]{background:#c2410c!important;color:#fff!important}
+button[onclick*="deleteMovement"]{background:#b91c1c!important;color:#fff!important}
+button[onclick*="showTab(previousTab)"]{background:#475569!important;color:#fff!important}
+button[onclick*="scrollIntoView"]{background:#1d4ed8!important;color:#fff!important}
+button[onclick*="attachPermit"]{background:#4f46e5!important;color:#fff!important}
+button[onclick*="saveNewEntry"]{background:#15803d!important;color:#fff!important}
+button[onclick*="clearNewEntry"]{background:#64748b!important;color:#fff!important}
+button[onclick*="analyzePermit"]{background:#0e7490!important;color:#fff!important}
+button[onclick*="search()"]{background:#6d28d9!important;color:#fff!important}
+button[onclick*="clearSearch"]{background:#64748b!important;color:#fff!important}
+button[onclick*="downloadControl('xlsx')"]{background:#15803d!important;color:#fff!important}
+button[onclick*="downloadControl('pdf')"]{background:#be123c!important;color:#fff!important}
+button[onclick*="previewImport"]{background:#7e22ce!important;color:#fff!important}
+button[onclick*="commitImport"]{background:#be185d!important;color:#fff!important}
+button[onclick*="showUpcomingAlerts"]{background:#c2410c!important;color:#fff!important}
+button[onclick*="previewAlerts"]{background:#b45309!important;color:#fff!important}
+button[onclick*="showAlertConfig"]{background:#0369a1!important;color:#fff!important}
+button[onclick*="showDateDiscrepancies"]{background:#7c3aed!important;color:#fff!important}
+button[onclick*="showReviewQueue"]{background:#9a3412!important;color:#fff!important}
+button[onclick*="showRelated"]{background:#4f46e5!important;color:#fff!important}
+button[onclick*="loadExpirations"]{background:#2563eb!important;color:#fff!important}
+#tab-avisos a.button[href*="/full"]{background:#047857;color:#fff;border-color:#047857}
+#tab-avisos a.button[href*="/download"]{background:#334155;color:#fff;border-color:#334155}
+button:disabled{opacity:.5;cursor:not-allowed}
+@media(max-width:760px){#detail.detail-panel{padding:12px}#detail .vessel-section{padding:12px}#detail .vessel-quick-actions button{flex:1 1 100%}}
+@media(prefers-reduced-motion:reduce){.tabs .tab{transition:none}}
+
+/* V36: vista previa visual bilingüe, aislada del DOM principal */
+.mail-html-frame{width:100%;height:620px;border:1px solid #b4cdd9;border-radius:12px;background:white;display:block;box-sizing:border-box}
+
+/* V56: ajustes para acceso Android por Chrome dentro de la LAN */
+@media(max-width:600px){
+  html,body{width:100%;max-width:100%;overflow-x:hidden}
+  main{padding:0 10px;margin:10px auto}
+  header.topbar{padding:12px 13px;min-height:unset;gap:7px}
+  .brand{gap:9px}.brand h1{font-size:19px}.brand small{font-size:9px}
+  .topbar .status{font-size:10px;padding:5px 8px;margin-top:5px}
+  .tabs{display:flex;flex-wrap:nowrap;overflow-x:auto;overscroll-behavior-x:contain;gap:5px;padding:6px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch}
+  .tabs .tab{flex:0 0 auto;white-space:nowrap;font-size:13px;min-height:44px;scroll-snap-align:start;padding:10px 14px}
+  .panel{padding:12px;margin-bottom:10px;border-radius:12px}
+  .toolbar,.welcome{display:flex;flex-direction:column;align-items:stretch;gap:9px}
+  .toolbar .actions,.welcome button{width:100%}
+  .stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+  .stat{padding:10px}.stat b{font-size:21px}
+  button,.button,.actions button,.actions a.button{min-height:44px;touch-action:manipulation}
+  input,textarea,select{min-height:44px;font-size:16px}
+  input[type=checkbox],input[type=radio]{min-height:auto;min-width:20px;min-height:20px}
+  .grid,.search-grid{grid-template-columns:minmax(0,1fr)}
+  .tablewrap{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .tablewrap table{min-width:600px}
+  #detail.detail-panel{padding:9px}
+  #detail .vessel-section{padding:11px}
+  .mail-html-frame{height:420px}
+  .actions{gap:7px}
+  #tab-avisos .actions>a.button{white-space:normal}
+}
+
+/* V57: campo de fecha editable y calendario integrado en escritorio y Android */
+.servamar-date-wrap{display:flex;align-items:stretch;position:relative;width:100%;min-width:0;gap:5px}
+.servamar-date-wrap>input[type=text]{flex:1 1 auto;min-width:0;width:100%}
+.servamar-calendar-btn{flex:0 0 48px;min-width:48px;padding:0 8px;min-height:44px;border:1px solid #afc8da;border-radius:10px;background:#e5f2fb;color:#164e63;cursor:pointer;font-size:22px;touch-action:manipulation}
+.servamar-calendar-btn:focus-visible{outline:3px solid #2563eb;outline-offset:2px}
+.servamar-native-date{position:absolute!important;right:0;top:0;width:52px!important;height:100%!important;min-width:52px!important;min-height:44px!important;opacity:.01;pointer-events:auto;z-index:2;cursor:pointer}
+@media(max-width:600px){.servamar-date-wrap{gap:7px}.servamar-calendar-btn{flex-basis:52px;min-height:48px}}
+
+/* V58 centro de avisos Android */
+.mobile-alarm-panel{margin:14px auto 18px;padding:14px 17px;border:1px solid #9abbd0;border-radius:12px;background:#eef7fc;color:#183c4b}
+.mobile-alarm-heading{display:flex;align-items:center;gap:12px;font-size:17px}
+.alarm-count{display:inline-flex;align-items:center;justify-content:center;background:#0b7190;color:white;border-radius:999px;min-width:27px;min-height:27px;font-weight:700;padding:1px 6px}
+.mobile-alarm-list{display:grid;gap:7px;margin-top:10px}
+.mobile-alarm-item{border:1px solid #c9e0e8;border-radius:9px;background:white;padding:9px 11px;display:flex;justify-content:space-between;gap:10px;align-items:center}
+.mobile-alarm-item>div{display:grid;gap:4px;min-width:0}
+.mobile-alarm-item span{font-size:13px;color:#526b78;overflow-wrap:anywhere}
+.alarm-disclaimer{font-size:12px;line-height:1.4;margin-bottom:0}
+@media(max-width:650px){.mobile-alarm-panel{padding:12px;margin:12px 0}.mobile-alarm-item{align-items:flex-start}.mobile-alarm-panel .actions{display:flex;flex-wrap:wrap}.mobile-alarm-panel button{max-width:100%}}
