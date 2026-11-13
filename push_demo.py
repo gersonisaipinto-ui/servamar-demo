@@ -49,8 +49,6 @@ def init_push(app, data_dir):
             db.execute("""CREATE TABLE IF NOT EXISTS daily_targets
                 (day TEXT NOT NULL, sub_id TEXT NOT NULL, PRIMARY KEY(day,sub_id))""")
     app.register_blueprint(bp)
-    # Programación única solicitada para el 13/11/2026 a las 13:50 GT.
-    threading.Thread(target=one_time_1350, daemon=True, name='servamar-prueba-1350').start()
 
 
 def keys():
@@ -302,27 +300,58 @@ def daily_check():
                        persistent=bool(PG_URL),
                        warning=None if success else "No se confirmaron todos los envíos de Web Push"), (200 if success else 503)
 
-def one_time_1350():
-    """Enviar una sola prueba el 13/11/2026 a las 13:50 Guatemala."""
-    from datetime import datetime
-    from zoneinfo import ZoneInfo
-    tz = ZoneInfo("America/Guatemala")
-    target = datetime(2026, 11, 13, 13, 50, 0, tzinfo=tz)
-    now = datetime.now(tz)
-    # No emitir fuera de una ventana de prueba de 90 segundos.
-    if now > target.replace(minute=51, second=30):
-        return
-    delay = (target - now).total_seconds()
-    if delay > 0:
-        time.sleep(delay)
-    key = "test-2026-11-13-1350"
-    with lock:
-        if daily_previous(key):
-            return
-        result = send_demo({
-            "title": "SERVAMAR - Prueba programada 13:50",
-            "body": "Aviso automático de prueba a las 13:50, hora de Guatemala. Sin datos de clientes."
-        }, day=key)
-        # Registramos solo los avisos aceptados; el proveedor puede tardar en mostrarlos.
-        if result["accepted"] > 0 and result["failed"] == 0:
-            record_day(key, 1, result["accepted"])
+
+def delivery_history(limit=20):
+    """Retorna agregados administrativos; nunca incluye endpoints ni claves."""
+    if PG_URL:
+        with pg_connect() as db:
+            rows = db.execute("""SELECT day,status,count,recipients,completed_at
+                FROM servamar_push_daily_delivery ORDER BY completed_at DESC LIMIT %s""",
+                (limit,)).fetchall()
+    else:
+        with sqlite3.connect(dbpath) as db:
+            rows = db.execute("""SELECT day,status,count,recipients,completed_at
+                FROM daily_delivery ORDER BY completed_at DESC LIMIT ?""",
+                (limit,)).fetchall()
+    return [{"date":r[0],"status":r[1],"alert_count":r[2],
+             "accepted_by_provider":r[3],"registered_at":r[4]} for r in rows]
+
+
+@bp.get("/api/push/status")
+def push_status():
+    """Diagnóstico protegido por HTTP Basic (comprobado en app.before_request)."""
+    now = datetime.now(ZoneInfo("America/Guatemala"))
+    registered = len(subscriptions())
+    history = delivery_history()
+    return jsonify(ok=True,time_guatemala=now.isoformat(),
+                   storage="PostgreSQL de prueba" if PG_URL else "Temporal (sin persistencia)",
+                   subscribers=registered,history=history,
+                   delivery_note="Aceptación por el proveedor push no confirma visualización en el dispositivo.")
+
+
+@bp.get("/api/push/schedule")
+def push_schedule():
+    """Vista previa administrativa de plazos ficticios. Sin envío de notificaciones."""
+    from app import planned_alerts_for_day
+    from datetime import timedelta
+    now = datetime.now(ZoneInfo("America/Guatemala")).date()
+    try:
+        horizon = max(1,min(int(request.args.get("days",45)),60))
+    except (TypeError,ValueError):
+        return jsonify(error="Días inválidos"),400
+    events=[]
+    for offset in range(horizon+1):
+        target = now+timedelta(days=offset)
+        planned = planned_alerts_for_day(target)
+        for item in planned["items"]:
+            events.append({
+                "notify_on":target.isoformat(),
+                "vessel":item.get("vessel") or "",
+                "category":item.get("category","vencimiento"),
+                "deadline":item.get("expiry_date"),
+                "days_before":item.get("days_before")
+            })
+    events.sort(key=lambda e:(e["notify_on"],e["vessel"],e["days_before"]))
+    return jsonify(ok=True,start=now.isoformat(),through=(now+timedelta(days=horizon)).isoformat(),
+                   count=len(events),events=events,
+                   note="Solo embarcaciones ficticias de demostración; vista previa sin envíos.")
