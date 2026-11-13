@@ -118,21 +118,19 @@ def vessels():
         data = validate(request.get_json(silent=True))
     except ValueError as error:
         return jsonify(error=str(error)), 400
-    with dbconnect() as db:
-        count = db.execute("SELECT COUNT(*) FROM servamar_demo_vessels").fetchone()[0]
-        if count >= 100:
-            return jsonify(error="Máximo 100 registros ficticios de prueba"), 409
-        try:
+    from psycopg.errors import UniqueViolation
+    try:
+        with dbconnect() as db:
+            count = db.execute("SELECT COUNT(*) FROM servamar_demo_vessels").fetchone()[0]
+            if count >= 100:
+                return jsonify(error="Máximo 100 registros ficticios de prueba"), 409
             row = db.execute("""INSERT INTO servamar_demo_vessels
                 (registration,vessel_name,captain,stage,entry_date,movement_date,due_date,notes)
                 VALUES(%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""", data).fetchone()
             db.execute("""INSERT INTO servamar_demo_vessel_audit(vessel_id,action,registration)
                 VALUES(%s,'create',%s)""",(row[0],data[0]))
-        except Exception as exc:
-            from psycopg.errors import UniqueViolation
-            if isinstance(exc, UniqueViolation):
-                return jsonify(error="Ya existe ese número de registro de prueba"),409
-            raise
+    except UniqueViolation:
+        return jsonify(error="Ya existe ese número de registro de prueba"),409
     return jsonify(ok=True,id=row[0]),201
 
 
@@ -149,15 +147,19 @@ def vessel_edit(vessel_id):
     if request.method == "PATCH":
         try: data = validate(payload)
         except ValueError as exc: return jsonify(error=str(exc)),400
-        with dbconnect() as db:
-            row = db.execute("""UPDATE servamar_demo_vessels SET
-                registration=%s,vessel_name=%s,captain=%s,stage=%s,entry_date=%s,
-                movement_date=%s,due_date=%s,notes=%s,version=version+1,updated_at=NOW()
-                WHERE id=%s AND version=%s RETURNING id""",(*data,vessel_id,expected)).fetchone()
-            if not row:
-                return jsonify(error="El registro cambió o fue eliminado; actualiza la lista"),409
-            db.execute("""INSERT INTO servamar_demo_vessel_audit(vessel_id,action,registration)
-                VALUES(%s,'update',%s)""",(vessel_id,data[0]))
+        from psycopg.errors import UniqueViolation
+        try:
+            with dbconnect() as db:
+                row = db.execute("""UPDATE servamar_demo_vessels SET
+                    registration=%s,vessel_name=%s,captain=%s,stage=%s,entry_date=%s,
+                    movement_date=%s,due_date=%s,notes=%s,version=version+1,updated_at=NOW()
+                    WHERE id=%s AND version=%s RETURNING id""",(*data,vessel_id,expected)).fetchone()
+                if not row:
+                    return jsonify(error="El registro cambió o fue eliminado; actualiza la lista"),409
+                db.execute("""INSERT INTO servamar_demo_vessel_audit(vessel_id,action,registration)
+                    VALUES(%s,'update',%s)""",(vessel_id,data[0]))
+        except UniqueViolation:
+            return jsonify(error="Ya existe ese número de registro de prueba"),409
         return jsonify(ok=True)
     with dbconnect() as db:
         existing = db.execute("""DELETE FROM servamar_demo_vessels WHERE id=%s AND version=%s
