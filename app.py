@@ -55,6 +55,8 @@ app=Flask(__name__)
 if DEMO_MODE:
  from push_demo import init_push
  init_push(app,DATA_DIR)
+ from demo_vessels import init_demo_vessels
+ init_demo_vessels(app)
 
 @app.get('/push-sw.js')
 def serve_push_worker():
@@ -72,7 +74,7 @@ def basic_protection():
   return jsonify(error='HTTPS obligatorio'),403
  if request.path == '/healthz' and not LAN_MODE:
   return None
- if DEMO_MODE and request.method not in ('GET','HEAD','OPTIONS') and request.path not in ('/api/push/subscribe','/api/push/unsubscribe','/api/push/test','/api/push/daily-check'):
+ if DEMO_MODE and request.method not in ('GET','HEAD','OPTIONS') and request.path not in ('/api/push/subscribe','/api/push/unsubscribe','/api/push/test','/api/push/daily-check') and not (request.path == '/api/demo/vessels' or request.path.startswith('/api/demo/vessels/')):
   return jsonify(error='DEMO GRATUITA: solo lectura. No se permiten modificaciones, importaciones ni envíos.'),403
  if LAN_MODE:
   from ipaddress import ip_address
