@@ -36,7 +36,14 @@
 <details class="help"><summary>Cómo usar los filtros</summary><p>Combina nombre, capitán y fechas. Para ingreso o vencimiento elige fecha exacta <b>o</b> mes/año, no ambos. Las referencias históricas pueden aparecer sin generar alarmas automáticas.</p></details>
 <div class="actions"><button onclick="search()">Buscar</button></div><p id="resultmeta" aria-live="polite" class="muted"></p><div class="tablewrap"><table><thead><tr><th>Embarcación</th><th>Declaración</th><th>Registro</th><th>Capitán</th><th>Etapa</th><th>Último movimiento</th><th>Plazo</th><th></th></tr></thead><tbody id="results"></tbody></table></div>
 </section></section>
-<section id="tab-avisos" class="tab-panel" hidden>
+<section id="tab-avisos" class="tab-panel" hidden><section class="panel" id="webpush-demo" style="margin:12px 0;border:1px solid #a5c9e0;padding:16px;border-radius:12px">
+<h3>Notificaciones Android y Windows — prueba de nube</h3>
+<p>Esta demostración solo envía avisos genéricos. No se incluyen datos de embarcaciones ni se envían recordatorios programados a clientes.</p>
+<div class="actions"><button type="button" onclick="servamarEnableWebPush()">Activar avisos en este dispositivo</button>
+<button class="secondary" type="button" onclick="servamarTestWebPush()">Enviar prueba en 12 segundos</button>
+<button class="secondary" type="button" onclick="servamarDisableWebPush()">Desactivar en este dispositivo</button></div>
+<p id="webpush-status" aria-live="polite">Primero activa los avisos. Después envía una prueba y cierra la pestaña.</p>
+<p class="muted">Render Free reinicia el servidor y puede borrar las suscripciones. En ese caso activa los avisos nuevamente. No hay todavía envíos automáticos diarios.</p></section>
 <section class="panel"><h2>Avisos y respaldos</h2><p class="muted">Revisa recordatorios y descarga copias de seguridad. Para enviar un correo manual: Buscar → abrir ficha → Enviar correo ahora. Primero guarda el correo y consentimiento en esa ficha.</p>
 <div class="actions"><button class="secondary" onclick="showUpcomingAlerts()">Próximos avisos (30 días)</button><button class="secondary" onclick="previewAlerts()">Avisos previstos para hoy</button><button class="secondary" onclick="showAlertConfig()">Estado de notificaciones</button><a class="button secondary" href="/api/backup/full" download>Respaldo completo (datos + documentos)</a><a class="button secondary" href="/api/backup/download" download>Descargar respaldo</a></div>
 <details class="detail-fold"><summary>Plantilla general para correos automáticos y manuales</summary>
@@ -54,4 +61,4 @@
 <section class="panel"><h2>Actualizar desde Excel</h2><p class="muted">Compatible con el control original, el archivo de depósito y la base consolidada. La importación preserva cambios locales, crea un respaldo y no valida fechas automáticamente.</p>
 <div class="actions"><input type="file" id="importfile" accept=".xlsx"><button class="secondary" onclick="previewImport()">Verificar archivo</button><button id="importcommit" disabled onclick="commitImport()">Importar cambios</button></div><pre id="importstatus" class="muted"></pre></section></section>
 <section id="detail" class="panel detail-panel" hidden></section>
-</main><footer>Fechas en dd/mm/yyyy · Los avisos a clientes requieren correo válido, consentimiento y confirmación del envío.</footer><script src="/static/app.js?v=58"></script><script src="/static/date-inputs.js?v=58" defer></script></body></html>
+</main><footer>Fechas en dd/mm/yyyy · Los avisos a clientes requieren correo válido, consentimiento y confirmación del envío.</footer><script src="/static/app.js?v=58"></script><script src="/static/date-inputs.js?v=58" defer></script><script src="/static/push-demo.js?v=61" defer></script></body></html>
