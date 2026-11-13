@@ -107,7 +107,6 @@ def daily_check():
  today=datetime.now(ZoneInfo("America/Guatemala")).date()
  day=today.isoformat()
  with lock,sqlite3.connect(dbpath) as db:
-  db.execute("BEGIN IMMEDIATE")
   previous=db.execute("SELECT status,count,recipients FROM daily_delivery WHERE day=?",(day,)).fetchone()
   if previous and previous[0]=="sent":
    return jsonify(ok=True,date=day,already_sent=True,alerts=previous[1],accepted=previous[2])
