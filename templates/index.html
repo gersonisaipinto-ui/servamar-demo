@@ -43,7 +43,12 @@
 <button class="secondary" type="button" onclick="servamarTestWebPush()">Enviar prueba en 12 segundos</button>
 <button class="secondary" type="button" onclick="servamarDisableWebPush()">Desactivar en este dispositivo</button></div>
 <p id="webpush-status" aria-live="polite">Primero activa los avisos. Después envía una prueba y cierra la pestaña.</p>
-<p class="muted">Render Free reinicia el servidor y puede borrar las suscripciones. En ese caso activa los avisos nuevamente. No hay todavía envíos automáticos diarios.</p></section>
+<p class="muted">Las suscripciones se guardan en PostgreSQL mientras la base de prueba permanezca disponible. La revisión diaria se ejecuta aproximadamente a las 08:00 de Guatemala mediante GitHub Actions, sin garantía de puntualidad ni de entrega final.</p>
+<div class="actions"><button class="secondary" type="button" onclick="servamarLoadPushSchedule()">Ver próximos recordatorios (45 días)</button>
+<button class="secondary" type="button" onclick="servamarLoadPushHistory()">Historial de notificaciones</button></div>
+<div id="webpush-schedule" class="muted" aria-live="polite"></div>
+<div id="webpush-history" class="muted" aria-live="polite"></div>
+</section>
 <section class="panel"><h2>Avisos y respaldos</h2><p class="muted">Revisa recordatorios y descarga copias de seguridad. Para enviar un correo manual: Buscar → abrir ficha → Enviar correo ahora. Primero guarda el correo y consentimiento en esa ficha.</p>
 <div class="actions"><button class="secondary" onclick="showUpcomingAlerts()">Próximos avisos (30 días)</button><button class="secondary" onclick="previewAlerts()">Avisos previstos para hoy</button><button class="secondary" onclick="showAlertConfig()">Estado de notificaciones</button><a class="button secondary" href="/api/backup/full" download>Respaldo completo (datos + documentos)</a><a class="button secondary" href="/api/backup/download" download>Descargar respaldo</a></div>
 <details class="detail-fold"><summary>Plantilla general para correos automáticos y manuales</summary>
@@ -61,4 +66,4 @@
 <section class="panel"><h2>Actualizar desde Excel</h2><p class="muted">Compatible con el control original, el archivo de depósito y la base consolidada. La importación preserva cambios locales, crea un respaldo y no valida fechas automáticamente.</p>
 <div class="actions"><input type="file" id="importfile" accept=".xlsx"><button class="secondary" onclick="previewImport()">Verificar archivo</button><button id="importcommit" disabled onclick="commitImport()">Importar cambios</button></div><pre id="importstatus" class="muted"></pre></section></section>
 <section id="detail" class="panel detail-panel" hidden></section>
-</main><footer>Fechas en dd/mm/yyyy · Los avisos a clientes requieren correo válido, consentimiento y confirmación del envío.</footer><script src="/static/app.js?v=58"></script><script src="/static/date-inputs.js?v=58" defer></script><script src="/static/push-demo.js?v=61" defer></script></body></html>
+</main><footer>Fechas en dd/mm/yyyy · Los avisos a clientes requieren correo válido, consentimiento y confirmación del envío.</footer><script src="/static/app.js?v=58"></script><script src="/static/date-inputs.js?v=58" defer></script><script src="/static/push-demo.js?v=62" defer></script></body></html>
