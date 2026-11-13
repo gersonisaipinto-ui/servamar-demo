@@ -5,6 +5,8 @@ on:
     paths:
       - 'app.py'
       - 'push_demo.py'
+      - 'demo_vessels.py'
+      - 'static/demo-vessels.js'
       - 'requirements.txt'
       - 'static/push-demo.js'
       - 'templates/index.html'
@@ -21,9 +23,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Verificar sintaxis de Python sin acceder a secretos ni datos reales
-        run: python -m py_compile app.py push_demo.py
+        run: python -m py_compile app.py push_demo.py demo_vessels.py
       - name: Verificar sintaxis de JavaScript
-        run: node --check static/push-demo.js
+        run: node --check static/push-demo.js && node --check static/demo-vessels.js
       - name: Instalar dependencias para pruebas locales ficticias
         run: python -m pip install -r requirements.txt
       - name: Verificar reglas de recordatorios (sin datos reales)
