@@ -308,10 +308,9 @@ def daily_check():
     day = today.isoformat()
     with lock:
         previous = daily_previous(day)
-        if previous and previous[0] == "sent":
-            record_check(day, "already_sent", previous[1], 0, 0)
-            return jsonify(ok=True, date=day, already_sent=True,
-                           alerts=previous[1], accepted=previous[2],sent_now=0)
+        # Do not return early when the day was already processed: a newly
+        # subscribed device must still be eligible. send_demo(day=...) skips
+        # only the devices that already received today's push.
         plan = planned_alerts_for_day(today)
         count = int(plan["count"])
         if not count:
@@ -333,12 +332,16 @@ def daily_check():
         success = result["subscribers"] > 0 and result["failed"] == 0
         if success:
             record_day(day, count, result["accepted"] + result["skipped"])
-        record_check(day, "sent" if success else "failed", count,
-                     result["accepted"],result["failed"])
+        repeat_only = bool(previous and previous[0] == "sent" and
+                           result["accepted"] == 0 and result["failed"] == 0)
+        record_check(day, "already_sent" if repeat_only else
+                     ("sent" if success else "failed"),
+                     count,result["accepted"],result["failed"])
         return jsonify(ok=success, date=day, alerts=count,
                        categories=categories, accepted=result["accepted"],
+                       sent_now=result["accepted"],
                        skipped=result["skipped"], failed=result["failed"],
-                       subscribers=result["subscribers"], already_sent=False,
+                       subscribers=result["subscribers"], already_sent=repeat_only,
                        persistent=bool(PG_URL),
                        warning=None if success else "No se confirmaron todos los envíos de Web Push"), (200 if success else 503)
 
