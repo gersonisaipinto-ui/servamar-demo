@@ -17,7 +17,9 @@
    if(sub){await sub.unsubscribe();sub=null;}
    sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:keyBytes(data.publicKey)});
    await post('/api/push/subscribe',sub.toJSON());
-   status('Avisos activados. En Render gratuito deberás reactivarlos después de un reinicio del servidor.');
+   status(data.ephemeral
+     ? 'Avisos activados en modo temporal. Después de reiniciar Render debes activarlos nuevamente.'
+     : 'Avisos activados con almacenamiento PostgreSQL. Suscripción guardada en la base de prueba.');
   }catch(e){status('No se pudo activar: '+e.message);}
  };
  window.servamarTestWebPush=async()=>{
