@@ -1,0 +1,50 @@
+name: SERVAMAR - revisión diaria de avisos DEMO
+on:
+  schedule:
+    # 14:00 UTC = 08:00 Guatemala (UTC-6, sin horario de verano).
+    # GitHub puede retrasar la ejecución; no es garantía de hora exacta.
+    - cron: "0 14 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: servamar-demo-daily-check
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Consultar vencimientos ficticios en SERVAMAR
+        env:
+          SERVAMAR_USER: ${{ secrets.SERVAMAR_DEMO_USERNAME }}
+          SERVAMAR_PASSWORD: ${{ secrets.SERVAMAR_DEMO_PASSWORD }}
+          SERVAMAR_URL: https://servamar-demo-gratis-2y03.onrender.com/api/push/daily-check
+        run: |
+          python - <<'PY'
+          import base64,json,os,sys,urllib.request,urllib.error
+          user=os.environ.get('SERVAMAR_USER','')
+          password=os.environ.get('SERVAMAR_PASSWORD','')
+          if not user or not password:
+              print('No se ejecutó: faltan SERVAMAR_DEMO_USERNAME o SERVAMAR_DEMO_PASSWORD en GitHub Actions Secrets.')
+              sys.exit(1)
+          header=base64.b64encode((user+':'+password).encode()).decode('ascii')
+          req=urllib.request.Request(os.environ['SERVAMAR_URL'],data=b'{}',method='POST',
+              headers={'Authorization':'Basic '+header,'Content-Type':'application/json','Accept':'application/json'})
+          try:
+              with urllib.request.urlopen(req,timeout=210) as resp:
+                  data=json.loads(resp.read())
+              print(json.dumps({'ok':data.get('ok'),'date':data.get('date'),
+                'alerts':data.get('alerts'),'accepted':data.get('accepted'),
+                'already_sent':data.get('already_sent')},ensure_ascii=False))
+              if not data.get('ok'):sys.exit(1)
+          except urllib.error.HTTPError as exc:
+              print('Error HTTP al consultar SERVAMAR:',exc.code)
+              sys.exit(1)
+          except Exception as exc:
+              print('Fallo de conexión o de consulta:',type(exc).__name__)
+              sys.exit(1)
+          PY
