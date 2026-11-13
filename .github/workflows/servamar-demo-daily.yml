@@ -4,6 +4,9 @@ on:
     # 14:00 UTC = 08:00 Guatemala (UTC-6, sin horario de verano).
     # GitHub puede retrasar la ejecución; no es garantía de hora exacta.
     - cron: "0 14 * * *"
+    # Segunda revisión de respaldo a las 08:30 GT. La deduplicación
+    # por dispositivo evita repetir avisos ya aceptados.
+    - cron: "30 14 * * *"
   workflow_dispatch:
 
 permissions:
@@ -39,8 +42,13 @@ jobs:
                   data=json.loads(resp.read())
               print(json.dumps({'ok':data.get('ok'),'date':data.get('date'),
                 'alerts':data.get('alerts'),'accepted':data.get('accepted'),
-                'already_sent':data.get('already_sent')},ensure_ascii=False))
+                'already_sent':data.get('already_sent'),
+                'skipped':data.get('skipped'),'failed':data.get('failed'),
+                'subscribers':data.get('subscribers')},ensure_ascii=False))
               if not data.get('ok'):sys.exit(1)
+              if data.get('alerts',0)>0 and data.get('subscribers',0)==0:
+                  print('Error: hay avisos pero ningún dispositivo registrado.')
+                  sys.exit(1)
           except urllib.error.HTTPError as exc:
               print('Error HTTP al consultar SERVAMAR:',exc.code)
               try:
