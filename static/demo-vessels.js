@@ -22,6 +22,7 @@
   $('dbdemo-save').textContent=r?'Guardar modificaciones':'Guardar nuevo registro';
   for(const k of fields){const v=r?r[k]:(k==='stage'?'ingreso':'');$('dbdemo-'+k).value=(k==='entry_date'||k==='movement_date')?fmt(v).replace('—',''):(v||'');}
   $('dbdemo-cancel').hidden=!r;
+  $('dbdemo-stage').disabled=!!r;
   $('dbdemo-movement-panel').hidden=!r;
   $('dbdemo-movement-history').replaceChildren();
   if(r){
