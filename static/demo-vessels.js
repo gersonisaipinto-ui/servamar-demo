@@ -53,6 +53,30 @@
   try{const d=await api('/api/demo/vessels');records=d.items;render();}catch(e){status(e.message,true);}
  };
  window.servamarDemoReset=()=>setRecord(null);
+ window.servamarDemoEditById=async(id)=>{
+   if(!records.length)await window.servamarDemoRefresh();
+   let item=records.find(x=>x.id===Number(id));
+   if(!item){await window.servamarDemoRefresh();item=records.find(x=>x.id===Number(id));}
+   if(!item){status('No se encontró el registro ficticio.',true);return;}
+   if(typeof showTab==='function')showTab('bdpruebas');
+   setRecord(item);
+   $('dbdemo-form').scrollIntoView({behavior:'smooth'});
+ };
+ window.servamarDemoSearch=async(filters)=>{
+   const d=await api('/api/demo/vessels');
+   const f=s=>String(s||'').toLocaleLowerCase('es');
+   return d.items.filter(item=>{
+     if(filters.q&&!f([item.registration,item.vessel_name,item.captain].join(' ')).includes(f(filters.q)))return false;
+     if(filters.vessel_name&&!f(item.vessel_name).includes(f(filters.vessel_name)))return false;
+     if(filters.registration_number&&!f(item.registration).includes(f(filters.registration_number)))return false;
+     if(filters.captain&&!f(item.captain).includes(f(filters.captain)))return false;
+     if(filters.entry_date&&item.entry_date!==filters.entry_date)return false;
+     if(filters.entry_month&&!item.entry_date.startsWith(filters.entry_month))return false;
+     if(filters.expiry_date&&item.due_date!==filters.expiry_date)return false;
+     if(filters.expiry_month&&!(item.due_date||'').startsWith(filters.expiry_month))return false;
+     return true;
+   });
+ };
  window.servamarDemoSave=async()=>{
   try{
     const obj=values();
