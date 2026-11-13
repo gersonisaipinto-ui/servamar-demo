@@ -2,6 +2,7 @@
 import sqlite3
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 import push_demo
@@ -20,6 +21,9 @@ class PushAuditTests(unittest.TestCase):
                 accepted INTEGER NOT NULL, failed INTEGER NOT NULL, checked_at TEXT NOT NULL)""")
             db.execute("""CREATE TABLE daily_targets (
                 day TEXT NOT NULL, sub_id TEXT NOT NULL, PRIMARY KEY(day,sub_id))""")
+            db.execute("""CREATE TABLE daily_delivery (
+                day TEXT PRIMARY KEY, status TEXT NOT NULL, count INTEGER NOT NULL,
+                recipients INTEGER NOT NULL, completed_at TEXT NOT NULL)""")
 
     def tearDown(self):
         push_demo.dbpath = self.old_path
@@ -42,6 +46,29 @@ class PushAuditTests(unittest.TestCase):
         self.assertFalse(push_demo.already_delivered("2026-11-16", "test-device"))
         with sqlite3.connect(push_demo.dbpath) as db:
             self.assertEqual(db.execute("SELECT count(*) FROM daily_targets").fetchone()[0], 1)
+
+
+    def test_backup_run_and_new_device(self):
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        import app
+        plan = {"count": 1, "items": [{"category": "vencimiento"}]}
+        first = {"accepted": 2, "failed": 0, "skipped": 0, "subscribers": 2}
+        second = {"accepted": 0, "failed": 0, "skipped": 2, "subscribers": 2}
+        third = {"accepted": 1, "failed": 0, "skipped": 2, "subscribers": 3}
+        with patch.object(app, "planned_alerts_for_day", return_value=plan), \
+             patch.object(push_demo, "send_demo", side_effect=[first,second,third]) as sender:
+            a,code1=push_demo.daily_check()
+            b,code2=push_demo.daily_check()
+            c,code3=push_demo.daily_check()
+        self.assertEqual((code1,code2,code3),(200,200,200))
+        self.assertEqual(sender.call_count,3)
+        self.assertEqual(a.get_json()["accepted"],2)
+        self.assertTrue(b.get_json()["already_sent"])
+        self.assertEqual(b.get_json()["sent_now"],0)
+        self.assertEqual(c.get_json()["accepted"],1)
+        self.assertFalse(c.get_json()["already_sent"])
+        self.assertEqual(len(push_demo.checks_history()),3)
 
 
 if __name__ == "__main__":
