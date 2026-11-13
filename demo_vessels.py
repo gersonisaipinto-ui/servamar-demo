@@ -160,6 +160,12 @@ def vessel_edit(vessel_id):
         from psycopg.errors import UniqueViolation
         try:
             with dbconnect() as db:
+                current=db.execute("""SELECT stage FROM servamar_demo_vessels
+                    WHERE id=%s AND version=%s FOR UPDATE""",(vessel_id,expected)).fetchone()
+                if not current:
+                    return jsonify(error="El registro cambió o fue eliminado; actualiza la lista"),409
+                if data[3] != current[0]:
+                    return jsonify(error="Para cambiar de etapa utiliza Registrar movimiento; así conservamos su historial"),400
                 row = db.execute("""UPDATE servamar_demo_vessels SET
                     registration=%s,vessel_name=%s,captain=%s,stage=%s,entry_date=%s,
                     movement_date=%s,due_date=%s,notes=%s,version=version+1,updated_at=NOW()
