@@ -80,7 +80,7 @@
 <label class="field">Número de registro ficticio<input id="dbdemo-registration" maxlength="29" placeholder="DEMO-001" autocomplete="off"></label>
 <label class="field">Embarcación ficticia<input id="dbdemo-vessel_name" maxlength="100" placeholder="EMBARCACIÓN DE PRUEBA" autocomplete="off"></label>
 <label class="field">Capitán ficticio<input id="dbdemo-captain" maxlength="100" placeholder="CAPITÁN DE PRUEBA" autocomplete="off"></label>
-<label class="field">Etapa<select id="dbdemo-stage"><option value="ingreso">Ingreso 90 días</option><option value="ampliacion">Ampliación (12 meses desde ingreso)</option><option value="deposito">Depósito 12 meses</option><option value="salida">Salida temporal 90 días</option><option value="cierre">Cierre del permiso</option></select></label>
+<label class="field">Etapa (para cambiarla, registra un movimiento)<select id="dbdemo-stage"><option value="ingreso">Ingreso 90 días</option><option value="ampliacion">Ampliación (12 meses desde ingreso)</option><option value="deposito">Depósito 12 meses</option><option value="salida">Salida temporal 90 días</option><option value="cierre">Cierre del permiso</option></select></label>
 <label class="field">Fecha de ingreso (dd/mm/yyyy)<input id="dbdemo-entry_date" placeholder="13/11/2026" maxlength="10" inputmode="numeric"></label>
 <label class="field">Fecha del movimiento (dd/mm/yyyy)<input id="dbdemo-movement_date" placeholder="13/11/2026" maxlength="10" inputmode="numeric"></label>
 <label class="field">Observaciones ficticias<input id="dbdemo-notes" maxlength="300" placeholder="Solo datos de prueba"></label>
@@ -119,4 +119,4 @@
 </section></section>
 {% endif %}
 <section id="detail" class="panel detail-panel" hidden></section>
-</main><footer>Fechas en dd/mm/yyyy · Los avisos a clientes requieren correo válido, consentimiento y confirmación del envío.</footer><script src="/static/app.js?v=58"></script><script src="/static/date-inputs.js?v=58" defer></script><script src="/static/push-demo.js?v=64" defer></script>{% if demo_mode %}<script src="/static/demo-vessels.js?v=2" defer></script>{% endif %}</body></html>
+</main><footer>Fechas en dd/mm/yyyy · Los avisos a clientes requieren correo válido, consentimiento y confirmación del envío.</footer><script src="/static/app.js?v=61"></script><script src="/static/date-inputs.js?v=58" defer></script><script src="/static/push-demo.js?v=64" defer></script>{% if demo_mode %}<script src="/static/demo-vessels.js?v=3" defer></script>{% endif %}</body></html>
