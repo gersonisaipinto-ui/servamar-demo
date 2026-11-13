@@ -43,6 +43,18 @@ jobs:
               if not data.get('ok'):sys.exit(1)
           except urllib.error.HTTPError as exc:
               print('Error HTTP al consultar SERVAMAR:',exc.code)
+              try:
+                  result=json.loads(exc.read(10000))
+                  # Solo métricas administrativas, nunca claves ni datos personales.
+                  print(json.dumps({k:result.get(k) for k in
+                    ('date','alerts','subscribers','accepted','failed','warning','already_sent')},
+                    ensure_ascii=False))
+                  if exc.code==503 and result.get('subscribers')==0:
+                      print('Acción: vuelve a activar Web Push en Windows y Android; Render Free perdió las suscripciones.')
+                  elif exc.code==503:
+                      print('Acción: el proveedor push rechazó las entregas; revisa las suscripciones en SERVAMAR.')
+              except (ValueError,UnicodeDecodeError):
+                  pass
               sys.exit(1)
           except Exception as exc:
               print('Fallo de conexión o de consulta:',type(exc).__name__)
