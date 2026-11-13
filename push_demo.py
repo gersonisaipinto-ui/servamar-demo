@@ -40,6 +40,10 @@ def init_push(app, data_dir):
                  recipients INTEGER NOT NULL, completed_at TEXT NOT NULL)""")
             db.execute("""CREATE TABLE IF NOT EXISTS servamar_push_daily_targets
                 (day TEXT NOT NULL, sub_id TEXT NOT NULL, PRIMARY KEY(day,sub_id))""")
+            db.execute("""CREATE TABLE IF NOT EXISTS servamar_push_checks
+                (id BIGSERIAL PRIMARY KEY, day TEXT NOT NULL, status TEXT NOT NULL,
+                 alerts INTEGER NOT NULL, accepted INTEGER NOT NULL, failed INTEGER NOT NULL,
+                 checked_at TEXT NOT NULL)""")
     else:
         with sqlite3.connect(dbpath) as db:
             db.execute("CREATE TABLE IF NOT EXISTS subscriptions (id TEXT PRIMARY KEY, content TEXT NOT NULL)")
@@ -48,6 +52,10 @@ def init_push(app, data_dir):
                  recipients INTEGER NOT NULL, completed_at TEXT NOT NULL)""")
             db.execute("""CREATE TABLE IF NOT EXISTS daily_targets
                 (day TEXT NOT NULL, sub_id TEXT NOT NULL, PRIMARY KEY(day,sub_id))""")
+            db.execute("""CREATE TABLE IF NOT EXISTS daily_checks
+                (id INTEGER PRIMARY KEY AUTOINCREMENT, day TEXT NOT NULL, status TEXT NOT NULL,
+                 alerts INTEGER NOT NULL, accepted INTEGER NOT NULL, failed INTEGER NOT NULL,
+                 checked_at TEXT NOT NULL)""")
     app.register_blueprint(bp)
 
 
@@ -262,6 +270,35 @@ def test_push():
                    message="Aviso programado para dentro de 12 segundos. Puedes cerrar la pestaña.")
 
 
+def record_check(day, status, alerts, accepted, failed):
+    """Historial de cada revisión, sin datos de clientes ni identificadores push."""
+    checked_at = datetime.now(ZoneInfo("America/Guatemala")).isoformat()
+    with lock:
+        if PG_URL:
+            with pg_connect() as db:
+                db.execute("""INSERT INTO servamar_push_checks
+                    (day,status,alerts,accepted,failed,checked_at) VALUES(%s,%s,%s,%s,%s,%s)""",
+                    (day,status,alerts,accepted,failed,checked_at))
+        else:
+            with sqlite3.connect(dbpath) as db:
+                db.execute("""INSERT INTO daily_checks
+                    (day,status,alerts,accepted,failed,checked_at) VALUES(?,?,?,?,?,?)""",
+                    (day,status,alerts,accepted,failed,checked_at))
+
+
+def checks_history(limit=30):
+    if PG_URL:
+        with pg_connect() as db:
+            rows=db.execute("""SELECT day,status,alerts,accepted,failed,checked_at
+                FROM servamar_push_checks ORDER BY id DESC LIMIT %s""",(limit,)).fetchall()
+    else:
+        with sqlite3.connect(dbpath) as db:
+            rows=db.execute("""SELECT day,status,alerts,accepted,failed,checked_at
+                FROM daily_checks ORDER BY id DESC LIMIT ?""",(limit,)).fetchall()
+    return [{"date":r[0],"status":r[1],"alerts":r[2],
+             "accepted":r[3],"failed":r[4],"checked_at":r[5]} for r in rows]
+
+
 @bp.post("/api/push/daily-check")
 def daily_check():
     # app.before_request enforces HTTP Basic credentials and HTTPS.
@@ -272,13 +309,16 @@ def daily_check():
     with lock:
         previous = daily_previous(day)
         if previous and previous[0] == "sent":
+            record_check(day, "already_sent", previous[1], 0, 0)
             return jsonify(ok=True, date=day, already_sent=True,
-                           alerts=previous[1], accepted=previous[2])
+                           alerts=previous[1], accepted=previous[2],sent_now=0)
         plan = planned_alerts_for_day(today)
         count = int(plan["count"])
         if not count:
+            record_check(day, "no_alerts", 0, 0, 0)
             return jsonify(ok=True, date=day, alerts=0, accepted=0,
-                           already_sent=False, note="No hay vencimientos programados hoy")
+                           already_sent=False, sent_now=0,
+                           note="No hay vencimientos programados hoy")
         categories = {}
         for item in plan["items"]:
             category = item.get("category", "vencimiento")
@@ -293,6 +333,8 @@ def daily_check():
         success = result["subscribers"] > 0 and result["failed"] == 0
         if success:
             record_day(day, count, result["accepted"] + result["skipped"])
+        record_check(day, "sent" if success else "failed", count,
+                     result["accepted"],result["failed"])
         return jsonify(ok=success, date=day, alerts=count,
                        categories=categories, accepted=result["accepted"],
                        skipped=result["skipped"], failed=result["failed"],
@@ -323,9 +365,10 @@ def push_status():
     now = datetime.now(ZoneInfo("America/Guatemala"))
     registered = len(subscriptions())
     history = delivery_history()
+    checks = checks_history()
     return jsonify(ok=True,time_guatemala=now.isoformat(),
                    storage="PostgreSQL de prueba" if PG_URL else "Temporal (sin persistencia)",
-                   subscribers=registered,history=history,
+                   subscribers=registered,history=history,checks=checks,
                    delivery_note="Aceptación por el proveedor push no confirma visualización en el dispositivo.")
 
 
