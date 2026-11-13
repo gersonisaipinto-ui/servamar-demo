@@ -28,6 +28,51 @@
    status(j.message+' Dispositivos registrados: '+j.subscribers+'.');
   }catch(e){status('Error en prueba: '+e.message);}
  };
+ const get=async path=>{
+   const r=await fetch(path,{credentials:'same-origin'});
+   const j=await r.json();
+   if(!r.ok)throw Error(j.error||('HTTP '+r.status));
+   return j;
+ };
+ const line=(parent,message)=>{
+   const p=document.createElement('p');
+   p.textContent=message;
+   parent.appendChild(p);
+ };
+ window.servamarLoadPushSchedule=async()=>{
+   const root=document.getElementById('webpush-schedule');
+   if(!root)return;
+   root.replaceChildren();
+   line(root,'Consultando próximos recordatorios ficticios...');
+   try{
+     const d=await get('/api/push/schedule?days=45');
+     root.replaceChildren();
+     line(root,'Avisos previstos entre '+d.start+' y '+d.through+': '+d.count+'.');
+     if(!d.events.length)line(root,'No hay recordatorios en este periodo.');
+     for(const item of d.events.slice(0,100)){
+       const category=item.category==='retorno_temporal'?'Retorno temporal':'Vencimiento';
+       line(root,item.notify_on+' · '+item.vessel+' · '+category+
+         ' · '+item.days_before+' día(s) antes del '+item.deadline);
+     }
+   }catch(e){root.replaceChildren();line(root,'No se pudo consultar la agenda: '+e.message);}
+ };
+ window.servamarLoadPushHistory=async()=>{
+   const root=document.getElementById('webpush-history');
+   if(!root)return;
+   root.replaceChildren();
+   line(root,'Consultando el historial...');
+   try{
+     const d=await get('/api/push/status');
+     root.replaceChildren();
+     line(root,'Almacenamiento: '+d.storage+' · Dispositivos inscritos: '+d.subscribers+'.');
+     line(root,d.delivery_note);
+     if(!d.history.length)line(root,'Todavía no hay envíos diarios registrados.');
+     for(const item of d.history){
+       line(root,item.registered_at+' · '+item.date+' · '+item.status+
+         ' · '+item.alert_count+' avisos · '+item.accepted_by_provider+' aceptaciones del proveedor.');
+     }
+   }catch(e){root.replaceChildren();line(root,'No se pudo consultar el historial: '+e.message);}
+ };
  window.servamarDisableWebPush=async()=>{
   try{
    const reg=await navigator.serviceWorker.getRegistration('/');
