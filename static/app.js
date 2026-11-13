@@ -47,13 +47,13 @@ const $=id=>document.getElementById(id);const escapeHtml=s=>String(s??'').replac
  return `${m[3]}-${m[2]}-${m[1]}`;
 };let selected=null;let previousTab='buscar';let movementRows=[];
 function showTab(tab){
- const names=['inicio','nuevo','buscar','avisos','exportar','excel'];if(!names.includes(tab))tab='inicio';
+ const names=['inicio','nuevo','buscar','avisos','exportar','excel'];if(document.getElementById('tab-bdpruebas'))names.push('bdpruebas');if(!names.includes(tab))tab='inicio';
  for(const name of names){const pane=$('tab-'+name);pane.hidden=name!==tab;const button=document.querySelector('[data-tab="'+name+'"]');button.classList.toggle('active',name===tab);button.setAttribute('aria-current',name===tab?'page':'false')}
  $('detail').hidden=true;previousTab=tab;
  if(tab==='inicio')loadExpirations();
  window.scrollTo({top:0,behavior:'instant'});
 }
-function showDetailPanel(){for(const name of ['inicio','nuevo','buscar','avisos','exportar','excel']){$('tab-'+name).hidden=true;document.querySelector('[data-tab="'+name+'"]').classList.remove('active')} $('detail').hidden=false}
+function showDetailPanel(){for(const name of ['inicio','nuevo','buscar','avisos','exportar','excel','bdpruebas']){const pane=$('tab-'+name);const tabbtn=document.querySelector('[data-tab="'+name+'"]');if(pane&&tabbtn){pane.hidden=true;tabbtn.classList.remove('active')}} $('detail').hidden=false}
 
 async function dashboard(){const v=await api('/api/dashboard');$('stats').innerHTML=[['Por vencer (30 días)',v.soon],['Vencidos (hist. incluidos)',v.expired],['Referencias históricas',v.review]].map(([k,n])=>`<div class="stat"><span>${k}</span><b>${n.toLocaleString('es-GT')}</b></div>`).join('')}
 let lastSearchRequest=0;
