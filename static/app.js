@@ -95,8 +95,17 @@ async function search(){
  for(const [key,value] of Object.entries({q,vessel_name,registration_number,captain,entry_date:entryIso,entry_month:entryMonth,expiry_date:expiryIso,expiry_month:expiryMonth}))if(value)params.set(key,value);
  try{
   const result=await api('/api/vessels?'+params.toString());if(requestNumber!==lastSearchRequest)return;
-  root.textContent=`${result.total} coincidencia(s) en el historial; ${result.items.length} mostrada(s)${result.total>result.items.length?' (afina los filtros para ver las demás)':''}.`;
-  $('results').innerHTML=result.items.map(v=>`<tr><td>${escapeHtml(v.name)}</td><td>${escapeHtml(v.declaration)}</td><td>${escapeHtml(v.registration_number||'—')}</td><td>${escapeHtml(v.captain)}</td><td>${escapeHtml(compactStage(v))}</td><td>${escapeHtml(formatDate(v.last_movement_date))}</td><td>${escapeHtml(compactTerm(v))}</td><td><button class="secondary" onclick="openVessel(${v.id})">Abrir</button></td></tr>`).join('')||'<tr><td colspan="8">No se encontraron embarcaciones con estos filtros.</td></tr>';
+  let demo=[];
+  if(document.getElementById('tab-bdpruebas')&&typeof servamarDemoSearch==='function'){
+    demo=await servamarDemoSearch({q,vessel_name,registration_number,captain,
+      entry_date:entryIso,entry_month:entryMonth,expiry_date:expiryIso,expiry_month:expiryMonth});
+    if(requestNumber!==lastSearchRequest)return;
+  }
+  root.textContent=demo.length?`${result.total} expediente(s) de muestra; ${demo.length} registro(s) editables en PostgreSQL.`:
+    `${result.total} expediente(s) de muestra; sin coincidencias editables en PostgreSQL.`;
+  const original=result.items.map(v=>`<tr><td>${escapeHtml(v.name)}</td><td>${escapeHtml(v.declaration)}</td><td>${escapeHtml(v.registration_number||'—')}</td><td>${escapeHtml(v.captain)}</td><td>${escapeHtml(compactStage(v))}</td><td>${escapeHtml(formatDate(v.last_movement_date))}</td><td>${escapeHtml(compactTerm(v))}</td><td><button class="secondary" onclick="openVessel(${v.id})">Abrir (solo lectura)</button></td></tr>`).join('');
+  const demoRows=demo.map(v=>`<tr><td>${escapeHtml(v.vessel_name)} (DEMO)</td><td>${escapeHtml(v.registration)}</td><td>Prueba PostgreSQL</td><td>${escapeHtml(v.captain)}</td><td>${escapeHtml(v.stage)}</td><td>${escapeHtml(formatDate(v.movement_date))}</td><td>${escapeHtml(formatDate(v.due_date))}</td><td><button class="secondary" onclick="servamarDemoEditById(${v.id})">Editar en prueba</button></td></tr>`).join('');
+  $('results').innerHTML=original+demoRows||'<tr><td colspan="8">No se encontraron embarcaciones con estos filtros.</td></tr>';
  }catch(e){if(requestNumber===lastSearchRequest){root.textContent=e.message;$('results').innerHTML=''}}
 }
 function renderStatusBanner(v,cd,archivedClosure){
@@ -233,6 +242,25 @@ async function saveNewEntry(){
  const out=$('new-message');out.className='muted';
  try{
   const data={declaration:$('new-st').value.trim(),name:$('new-name').value.trim(),registration_number:$('new-registration').value.trim(),captain:$('new-captain').value.trim(),start_date:toIsoDate($('new-entry').value,'Ingreso'),email:$('new-email').value.trim(),notes:$('new-notes').value.trim(),document_token:permitToken,confirmed:true};
+  if(document.getElementById('tab-bdpruebas')){
+    if(data.email||data.document_token||document.getElementById('permit-file')?.files?.length)
+      throw Error('En esta prueba no se guardan correos ni documentos. Usa datos ficticios y deja esos campos vacíos.');
+    if(!/^DEMO-[A-Z0-9-]{2,24}$/i.test(data.declaration))
+      throw Error('Para probar en la nube, el número ST debe comenzar con DEMO- (por ejemplo, DEMO-001).');
+    if(!data.captain||data.captain.trim().length<2)
+      throw Error('Introduce el nombre de un capitán ficticio.');
+    const payload={registration:data.declaration,vessel_name:data.name,
+      captain:data.captain,stage:'ingreso',entry_date:data.start_date,
+      movement_date:data.start_date,notes:data.notes};
+    const created=await api('/api/demo/vessels',{
+      method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    clearNewEntry();
+    out.className='alert success';
+    out.textContent='Ingreso ficticio DEMO guardado en PostgreSQL. No se enviaron correos ni se guardaron documentos.';
+    if(typeof servamarDemoRefresh==='function')await servamarDemoRefresh();
+    if(typeof servamarDemoEditById==='function')await servamarDemoEditById(created.id);
+    return;
+  }
   const result=await post('/api/vessels/new',data);
   clearNewEntry();out.className='alert success';out.textContent='Ingreso registrado. Vencimiento: '+formatDate(result.expiry_date)+'. No se enviaron correos.';
   await Promise.all([dashboard(),loadExpirations()]);await openVessel(result.id);
