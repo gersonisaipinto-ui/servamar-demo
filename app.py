@@ -3,7 +3,7 @@ import os, sqlite3, json, threading, smtplib, ssl, calendar, csv, io, sys, re
 from datetime import date, datetime, timedelta
 from email.message import EmailMessage
 from pathlib import Path
-from flask import Flask, request, jsonify, render_template, send_file, abort
+from flask import Flask, request, jsonify, render_template, send_file, abort, send_from_directory
 from functools import wraps
 import hmac, secrets, uuid, hashlib, zipfile, shutil
 from xml.sax.saxutils import escape as xml_escape
@@ -52,6 +52,16 @@ from lan_security import lan_is_enabled, check_lan_credentials, lan_config_path
 LAN_MODE=lan_is_enabled(DATA_DIR) and not CLOUD_MODE
 DB=Path(os.environ.get('BOATS_DB',str(DATA_DIR/'embarcaciones.sqlite3')))
 app=Flask(__name__)
+if DEMO_MODE:
+ from push_demo import init_push
+ init_push(app,DATA_DIR)
+
+@app.get('/push-sw.js')
+def serve_push_worker():
+ response=send_from_directory(ROOT,'push-sw.js',mimetype='text/javascript')
+ response.headers['Service-Worker-Allowed']='/'
+ return response
+
 VERSION='60'
 app.config["MAX_CONTENT_LENGTH"] = 12 * 1024 * 1024
 
@@ -62,7 +72,7 @@ def basic_protection():
   return jsonify(error='HTTPS obligatorio'),403
  if request.path == '/healthz' and not LAN_MODE:
   return None
- if DEMO_MODE and request.method not in ('GET','HEAD','OPTIONS'):
+ if DEMO_MODE and request.method not in ('GET','HEAD','OPTIONS') and request.path not in ('/api/push/subscribe','/api/push/unsubscribe','/api/push/test'):
   return jsonify(error='DEMO GRATUITA: solo lectura. No se permiten modificaciones, importaciones ni envíos.'),403
  if LAN_MODE:
   from ipaddress import ip_address
