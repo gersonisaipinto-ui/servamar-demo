@@ -45,6 +45,16 @@ def init_demo_vessels(app):
             action TEXT NOT NULL,
             registration TEXT NOT NULL,
             at_time TIMESTAMPTZ NOT NULL DEFAULT NOW())""")
+        db.execute("""CREATE TABLE IF NOT EXISTS servamar_demo_movements (
+            id BIGSERIAL PRIMARY KEY,
+            vessel_id BIGINT NOT NULL,
+            kind TEXT NOT NULL,
+            event_date DATE NOT NULL,
+            stage_before TEXT NOT NULL,
+            due_before DATE,
+            stage_after TEXT NOT NULL,
+            due_after DATE,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())""")
     app.register_blueprint(bp)
 
 
@@ -180,3 +190,99 @@ def audit():
         "id":r[0],"action":r[1],"registration":r[2],
         "at":r[3].astimezone(ZoneInfo("America/Guatemala")).isoformat()
     } for r in rows])
+
+
+def movement_transition(stage, due, entry, event_date, kind, previous_exit=None):
+    """Movimientos ficticios sin efectos sobre permisos reales.
+
+    La fecha indicada por el usuario es una simulación: no certifica permisos.
+    """
+    if kind not in {"ampliacion","deposito","salida","retorno","cierre"}:
+        raise ValueError("Movimiento de prueba inválido")
+    if event_date < entry:
+        raise ValueError("El movimiento no puede anteceder al ingreso")
+    if stage == "cierre":
+        raise ValueError("Un permiso cerrado no admite movimientos; crea un nuevo ingreso de prueba")
+    if kind == "ampliacion":
+        if stage != "ingreso":
+            raise ValueError("La ampliación solo procede desde ingreso inicial en este laboratorio")
+        return "ampliacion",add_months(entry,12)
+    if kind == "deposito":
+        if stage not in ("ingreso","ampliacion"):
+            raise ValueError("No se puede ingresar a depósito desde esta etapa")
+        return "deposito",add_months(event_date,12)
+    if kind == "salida":
+        if stage not in ("ingreso","ampliacion"):
+            raise ValueError("La salida temporal no está permitida desde depósito o con otra salida abierta")
+        return "salida",event_date+timedelta(days=90)
+    if kind == "retorno":
+        if stage != "salida" or not previous_exit:
+            raise ValueError("No existe salida temporal activa para registrar el retorno")
+        exit_date=previous_exit["event_date"]
+        if event_date < exit_date:
+            raise ValueError("El retorno no puede ser anterior a la salida")
+        days_away=(event_date-exit_date).days
+        if days_away>=90:
+            return "cierre",None
+        saved_stage=previous_exit["stage_before"]
+        saved_due=previous_exit["due_before"]
+        if not saved_due:
+            raise ValueError("Falta el vencimiento anterior a la salida")
+        return saved_stage,saved_due+timedelta(days=days_away)
+    return "cierre",None
+
+
+@bp.post("/api/demo/vessels/<int:vessel_id>/movement")
+def add_demo_movement(vessel_id):
+    payload=request.get_json(silent=True)
+    if not isinstance(payload,dict):
+        return jsonify(error="Solicitud JSON inválida"),400
+    try:
+        expected=int(payload.get("version"))
+        if expected<1:raise ValueError("Versión no válida")
+        kind=str(payload.get("kind") or "").strip().lower()
+        event_date=date.fromisoformat(str(payload.get("event_date") or ""))
+        if not 2000<=event_date.year<=2100:raise ValueError("Fecha fuera del rango de prueba")
+    except (TypeError,ValueError) as e:
+        return jsonify(error=str(e) or "Verifica la fecha y la versión"),400
+    with dbconnect() as db:
+        v=db.execute("""SELECT registration,stage,due_date,entry_date,movement_date,version
+            FROM servamar_demo_vessels WHERE id=%s FOR UPDATE""",(vessel_id,)).fetchone()
+        if not v:return jsonify(error="Registro ficticio no encontrado"),404
+        registration,stage,due,entry,last_date,version=v
+        if version!=expected:return jsonify(error="Este registro fue editado. Actualiza la lista"),409
+        if event_date<last_date:
+            return jsonify(error="La fecha del movimiento no puede ser anterior al último movimiento registrado"),400
+        previous_exit=None
+        if kind=="retorno":
+            last=db.execute("""SELECT event_date,stage_before,due_before
+                FROM servamar_demo_movements WHERE vessel_id=%s AND kind='salida'
+                ORDER BY id DESC LIMIT 1""",(vessel_id,)).fetchone()
+            if last:
+                previous_exit={"event_date":last[0],"stage_before":last[1],"due_before":last[2]}
+        try:
+            next_stage,next_due=movement_transition(stage,due,entry,event_date,kind,previous_exit)
+        except ValueError as exc:
+            return jsonify(error=str(exc)),400
+        db.execute("""UPDATE servamar_demo_vessels
+            SET stage=%s,due_date=%s,movement_date=%s,version=version+1,updated_at=NOW()
+            WHERE id=%s""",(next_stage,next_due,event_date,vessel_id))
+        db.execute("""INSERT INTO servamar_demo_movements
+            (vessel_id,kind,event_date,stage_before,due_before,stage_after,due_after)
+            VALUES(%s,%s,%s,%s,%s,%s,%s)""",
+            (vessel_id,kind,event_date,stage,due,next_stage,next_due))
+        db.execute("""INSERT INTO servamar_demo_vessel_audit(vessel_id,action,registration)
+            VALUES(%s,%s,%s)""",(vessel_id,"movement_"+kind,registration))
+    return jsonify(ok=True,stage=next_stage,due_date=next_due.isoformat() if next_due else None)
+
+
+@bp.get("/api/demo/vessels/<int:vessel_id>/movements")
+def demo_movement_history(vessel_id):
+    with dbconnect() as db:
+        rows=db.execute("""SELECT kind,event_date,stage_before,due_before,stage_after,due_after
+            FROM servamar_demo_movements WHERE vessel_id=%s ORDER BY id DESC LIMIT 50""",
+            (vessel_id,)).fetchall()
+    return jsonify(ok=True,items=[{
+        "kind":r[0],"event_date":r[1].isoformat(),"stage_before":r[2],
+        "due_before":r[3].isoformat() if r[3] else None,"stage_after":r[4],
+        "due_after":r[5].isoformat() if r[5] else None} for r in rows])
