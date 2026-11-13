@@ -1,8 +1,11 @@
 'use strict';
 self.addEventListener('push',event=>{
- event.waitUntil(self.registration.showNotification('SERVAMAR — Aviso de prueba',{
-  body:'Esta es una notificación de prueba sin datos de expedientes.',
-  tag:'servamar-prueba',data:{url:'/'}
+ let content={};
+ try{content=event.data?event.data.json():{};}catch(e){content={};}
+ const title=typeof content.title==='string'?content.title.slice(0,90):'SERVAMAR - Notificación';
+ const body=typeof content.body==='string'?content.body.slice(0,180):'Aviso de SERVAMAR.';
+ event.waitUntil(self.registration.showNotification(title,{
+  body,tag:'servamar-administrativo',data:{url:'/'}
  }));
 });
 self.addEventListener('notificationclick',event=>{
