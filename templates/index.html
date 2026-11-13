@@ -24,9 +24,10 @@
 <section class="panel compact"><div class="toolbar"><h3>Control de vencimientos</h3><div class="actions"><select id="expiry-mode" aria-label="Ver vencimientos" onchange="loadExpirations()"><option value="upcoming">Próximos 30 días</option><option value="overdue">Vencidos</option><option value="departures">Salidas temporales</option><option value="review">Referencias históricas</option></select><a id="exp-csv" href="/api/expirations.csv" download>Exportar CSV</a></div></div><p id="expmeta" class="muted"></p><div class="tablewrap"><table><thead><tr><th>Embarcación</th><th>Nombre del capitán</th><th>Etapa</th><th>Vencimiento</th><th>Fecha</th><th></th></tr></thead><tbody id="expresults"></tbody></table></div></section>
 </section>
 <section id="tab-nuevo" class="tab-panel" hidden><section class="panel"><h2>Registrar nuevo ingreso</h2><p class="muted">Puedes ingresar los datos manualmente o adjuntar una fotografía/PDF para obtener sugerencias. Revisa todos los datos antes de guardar.</p>
+{% if demo_mode %}<p class="alert">Modo DEMO: puedes guardar ingresos ficticios en PostgreSQL desde este formulario. Usa DEMO-001 como número ST y no introduzcas datos de clientes, correos ni permisos reales. El campo «Número de registro» todavía no se usa en el laboratorio.</p>{% endif %}
 <div class="actions"><input type="file" id="permit-file" accept="image/jpeg,image/png,image/webp,application/pdf"><button class="secondary" onclick="analyzePermit()">Leer permiso (opcional)</button><button class="secondary" type="button" onclick="clearNewEntry()">Limpiar formulario / otro permiso</button></div><p class="muted" id="permit-status" aria-live="polite">No has adjuntado ningún documento.</p>
 <p id="ocr-field-status" class="muted" aria-live="polite">Al leer un permiso, aquí aparecerá el estado de reconocimiento de cada campo.</p>
-<div class="grid"><label class="field">Número ST *<input name="declaracion_servamar_nueva" autocomplete="off" autocapitalize="characters" spellcheck="false" id="new-st" placeholder="ST-2026-257"></label><label class="field">Nombre de embarcación *<input name="nombre_embarcacion_nuevo" autocomplete="off" id="new-name"></label><label class="field">Número de registro (opcional)<input name="registro_embarcacion_nuevo" autocomplete="off" id="new-registration" placeholder="Para vincular permisos de la misma embarcación" maxlength="200"></label><label class="field">Nombre del capitán<input name="capitan_servamar_nuevo" autocomplete="off" id="new-captain"></label><label class="field">Fecha de ingreso * (dd/mm/yyyy)<input name="fecha_ingreso_servamar" autocomplete="off" id="new-entry" inputmode="numeric" placeholder="dd/mm/yyyy" maxlength="10"></label><label class="field">Vencimiento inicial calculado<input name="vencimiento_calculado_servamar" autocomplete="off" id="new-expiry" readonly placeholder="90 días desde el ingreso"></label><label class="field">Correo de cliente (opcional)<input name="correo_contacto_embarcacion" autocomplete="email" id="new-email" type="email"></label><label class="field full">Observaciones<textarea id="new-notes" rows="2"></textarea></label></div><div class="actions"><button onclick="saveNewEntry()">Guardar ingreso y documento</button></div><p id="new-message" aria-live="polite"></p></section></section>
+<div class="grid"><label class="field">Número ST *<input name="declaracion_servamar_nueva" autocomplete="off" autocapitalize="characters" spellcheck="false" id="new-st" placeholder="ST-2026-257"></label><label class="field">Nombre de embarcación *<input name="nombre_embarcacion_nuevo" autocomplete="off" id="new-name"></label><label class="field">Número de registro (opcional)<input name="registro_embarcacion_nuevo" autocomplete="off" id="new-registration" placeholder="Para vincular permisos de la misma embarcación" maxlength="200"></label><label class="field">Nombre del capitán<input name="capitan_servamar_nuevo" autocomplete="off" id="new-captain"></label><label class="field">Fecha de ingreso * (dd/mm/yyyy)<input name="fecha_ingreso_servamar" autocomplete="off" id="new-entry" inputmode="numeric" placeholder="dd/mm/yyyy" maxlength="10"></label><label class="field">Vencimiento inicial calculado<input name="vencimiento_calculado_servamar" autocomplete="off" id="new-expiry" readonly placeholder="90 días desde el ingreso"></label><label class="field">Correo de cliente (opcional)<input name="correo_contacto_embarcacion" autocomplete="email" id="new-email" type="email"></label><label class="field full">Observaciones<textarea id="new-notes" rows="2"></textarea></label></div><div class="actions"><button onclick="saveNewEntry()">{% if demo_mode %}Guardar ingreso ficticio en PostgreSQL{% else %}Guardar ingreso y documento{% endif %}</button></div><p id="new-message" aria-live="polite"></p></section></section>
 <section id="tab-buscar" class="tab-panel" hidden>
 <section class="panel"><div class="toolbar"><div><h2>Buscar embarcaciones</h2><p>Encuentra registros actuales e históricos, ordenados por vencimiento próximo: vigentes, vencidos recientes y registros sin fecha.</p></div><button class="secondary" onclick="clearSearch()">Limpiar</button></div>
 <div class="search-grid"><label class="field">Número ST / búsqueda general<input id="search" placeholder="ST-2026-257" autocomplete="off"></label><label class="field">Nombre de embarcación<input id="vessel-name-search" placeholder="Nombre completo o parcial" autocomplete="off"></label><label class="field">Número de registro<input id="registration-search" placeholder="Buscar permisos asociados" autocomplete="off"></label><label class="field">Nombre del capitán<input id="captainsearch" placeholder="Nombre o apellido" autocomplete="off"></label>
@@ -71,7 +72,7 @@
 <section id="tab-bdpruebas" class="tab-panel" hidden>
 <section class="panel">
 <h2>Laboratorio de base de datos — PostgreSQL</h2>
-<p class="muted">Esta sección permite crear, modificar y eliminar solamente embarcaciones ficticias. Se guarda en una tabla PostgreSQL de prueba, completamente separada de la base operativa y de los avisos reales. No se permiten números de registro reales: usa el prefijo DEMO-.</p>
+<p class="muted">Esta sección permite crear, modificar, registrar movimientos y eliminar embarcaciones ficticias. Se guarda en PostgreSQL de prueba, completamente separado de la base operativa. También puedes iniciar un registro ficticio desde «Nuevo ingreso» y encontrarlo mediante «Buscar». No se permiten registros reales: usa DEMO-.</p>
 <p><strong>Atención:</strong> PostgreSQL Free vence el 13/12/2026. No introduzcas información de clientes, documentos ni expedientes auténticos. El cálculo de fechas es orientativo, no una autorización aduanera.</p>
 <div id="dbdemo-form">
 <h3 id="dbdemo-title">Nuevo registro ficticio</h3>
@@ -93,8 +94,29 @@
 <p id="dbdemo-status" class="muted" aria-live="polite">Laboratorio independiente de la base operativa.</p>
 </div>
 <div class="tablewrap"><p id="dbdemo-count" class="muted">Cargando registros...</p><div id="dbdemo-list"></div></div>
+<div id="dbdemo-movement-panel" class="panel" hidden>
+<h3>Registrar movimiento de embarcación ficticia</h3>
+<p id="dbdemo-movement-selected" class="muted"></p>
+<div class="grid">
+<label class="field">Tipo de movimiento
+<select id="dbdemo-movement-kind">
+<option value="ampliacion">Ampliación 9 meses adicionales (12 desde ingreso)</option>
+<option value="deposito">Ingreso a depósito — 12 meses</option>
+<option value="salida">Salida temporal — máximo 90 días</option>
+<option value="retorno">Retorno de salida temporal</option>
+<option value="cierre">Cierre de permiso</option>
+</select></label>
+<label class="field">Fecha del movimiento (dd/mm/yyyy)
+<input id="dbdemo-movement-event" inputmode="numeric" maxlength="10" placeholder="dd/mm/yyyy">
+</label></div>
+<div class="actions"><button type="button" onclick="servamarDemoMove()">Guardar movimiento ficticio</button>
+<button class="secondary" type="button" onclick="servamarDemoMovementHistory()">Ver movimientos registrados</button></div>
+<p id="dbdemo-movement-message" aria-live="polite" class="muted"></p>
+<div id="dbdemo-movement-history" class="muted"></div>
+<p class="muted">La fecha de vencimiento se recalcula según el tipo de movimiento. Una salida temporal impide depósito o ampliación hasta registrar retorno. Este laboratorio es una simulación, no una autorización oficial.</p>
+</div>
 <div id="dbdemo-audit" class="muted" aria-live="polite"></div>
 </section></section>
 {% endif %}
 <section id="detail" class="panel detail-panel" hidden></section>
-</main><footer>Fechas en dd/mm/yyyy · Los avisos a clientes requieren correo válido, consentimiento y confirmación del envío.</footer><script src="/static/app.js?v=58"></script><script src="/static/date-inputs.js?v=58" defer></script><script src="/static/push-demo.js?v=64" defer></script>{% if demo_mode %}<script src="/static/demo-vessels.js?v=1" defer></script>{% endif %}</body></html>
+</main><footer>Fechas en dd/mm/yyyy · Los avisos a clientes requieren correo válido, consentimiento y confirmación del envío.</footer><script src="/static/app.js?v=58"></script><script src="/static/date-inputs.js?v=58" defer></script><script src="/static/push-demo.js?v=64" defer></script>{% if demo_mode %}<script src="/static/demo-vessels.js?v=2" defer></script>{% endif %}</body></html>
