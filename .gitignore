@@ -1,0 +1,9 @@
+*.sqlite3
+*.sqlite3-*
+*.env
+correo_local.env
+private_permits/
+backups/
+*.zip
+__pycache__/
+*.pyc

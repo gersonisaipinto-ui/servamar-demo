@@ -1,0 +1,26 @@
+# Prueba desechable y de solo lectura. NO usa base real ni disco persistente.
+services:
+  - type: web
+    name: servamar-demo-gratis
+    runtime: python
+    plan: free
+    region: oregon
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --bind 0.0.0.0:$PORT --workers 1 --threads 2 --timeout 120 app:app
+    healthCheckPath: /healthz
+    autoDeploy: false
+    envVars:
+      - key: SERVAMAR_DEMO_MODE
+        value: YES
+      - key: SERVAMAR_CLOUD_MODE
+        value: YES
+      - key: APP_USERNAME
+        sync: false
+      - key: APP_PASSWORD
+        sync: false
+      - key: ENABLE_CLIENT_EMAIL
+        value: 'NO'
+      - key: CONFIRM_EMAIL_SEND
+        value: 'NO'
+      - key: ENABLE_ADMIN_AUTOMATION
+        value: 'NO'
