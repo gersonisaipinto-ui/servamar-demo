@@ -1,0 +1,24 @@
+name: SERVAMAR - verificar código
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app.py'
+      - 'push_demo.py'
+      - 'requirements.txt'
+      - 'static/push-demo.js'
+      - '.github/workflows/servamar-syntax.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verificar sintaxis de Python sin acceder a secretos ni datos reales
+        run: python -m py_compile app.py push_demo.py
+      - name: Verificar sintaxis de JavaScript
+        run: node --check static/push-demo.js
