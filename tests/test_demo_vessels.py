@@ -83,6 +83,50 @@ class DemoVesselsRulesTests(unittest.TestCase):
             movement_transition('cierre',None,date(2026,11,13),
                                 date(2026,12,5),'ampliacion')
 
+    def test_demo_reminder_month_before_expiry(self):
+        from unittest.mock import patch
+        from demo_vessels import demo_reminders_for_day
+        today=date(2026,11,13)
+        fixture={"id":1,"declaration":"DEMO-TEST-01","name":"BARCO FICTICIO",
+            "temporarily_away":False,"closure_due_to_90_days":False,
+            "operational_date":"2026-12-13"}
+        with patch("demo_vessels.demo_operational_rows",return_value=[fixture]):
+            result=demo_reminders_for_day(today)
+        self.assertEqual(len(result),1)
+        self.assertEqual(result[0]["days_before"],30)
+        self.assertEqual(result[0]["source"],"PostgreSQL DEMO")
+
+    def test_demo_reminder_15_and_1_day(self):
+        from unittest.mock import patch
+        from demo_vessels import demo_reminders_for_day
+        fixture={"id":2,"declaration":"DEMO-TEST-02","name":"PRUEBA",
+            "temporarily_away":False,"closure_due_to_90_days":False,
+            "operational_date":"2026-12-13"}
+        with patch("demo_vessels.demo_operational_rows",return_value=[fixture]):
+            self.assertEqual([e["days_before"] for e in demo_reminders_for_day(date(2026,11,28))],[15])
+            self.assertEqual([e["days_before"] for e in demo_reminders_for_day(date(2026,12,12))],[1])
+
+    def test_temporary_departure_reminder_7_days(self):
+        from unittest.mock import patch
+        from demo_vessels import demo_reminders_for_day
+        fixture={"id":3,"declaration":"DEMO-EXIT-01","name":"SALIDA DE PRUEBA",
+            "temporarily_away":True,"closure_due_to_90_days":False,
+            "operational_date":"2026-12-13"}
+        with patch("demo_vessels.demo_operational_rows",return_value=[fixture]):
+            result=demo_reminders_for_day(date(2026,12,6))
+        self.assertEqual(len(result),1)
+        self.assertEqual(result[0]["days_before"],7)
+        self.assertEqual(result[0]["category"],"retorno_temporal")
+
+    def test_closed_permit_sends_no_reminders(self):
+        from unittest.mock import patch
+        from demo_vessels import demo_reminders_for_day
+        fixture={"id":4,"declaration":"DEMO-CLOSED-01","name":"CERRADA",
+            "temporarily_away":True,"closure_due_to_90_days":True,
+            "operational_date":"2026-12-13"}
+        with patch("demo_vessels.demo_operational_rows",return_value=[fixture]):
+            self.assertEqual(demo_reminders_for_day(date(2026,12,12)),[])
+
     def test_ajuste_ultimo_dia_del_mes(self):
         self.assertEqual(add_months(date(2024,2,29),12),date(2025,2,28))
 
