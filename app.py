@@ -65,7 +65,7 @@ def serve_push_worker():
  response.headers['Service-Worker-Allowed']='/'
  return response
 
-VERSION='61'
+VERSION='62'
 app.config["MAX_CONTENT_LENGTH"] = 12 * 1024 * 1024
 
 @app.before_request
