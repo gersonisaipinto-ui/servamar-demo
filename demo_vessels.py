@@ -296,7 +296,7 @@ def demo_movement_history(vessel_id):
 
 def demo_operational_rows(today=None):
     """Read-only summary of *fictitious* PostgreSQL vessels for the demo dashboard."""
-    today=today or date.today()
+    today=today or datetime.now(ZoneInfo("America/Guatemala")).date()
     with dbconnect() as db:
         rows=db.execute("""SELECT id,registration,vessel_name,captain,stage,entry_date,
             movement_date,due_date FROM servamar_demo_vessels
