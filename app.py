@@ -55,8 +55,9 @@ app=Flask(__name__)
 if DEMO_MODE:
  from push_demo import init_push
  init_push(app,DATA_DIR)
- from demo_vessels import init_demo_vessels
- init_demo_vessels(app)
+ if CLOUD_MODE:
+  from demo_vessels import init_demo_vessels
+  init_demo_vessels(app)
 
 @app.get('/push-sw.js')
 def serve_push_worker():
@@ -1415,7 +1416,7 @@ def expirations():
  mode=request.args.get('mode','upcoming')
  if mode not in ('upcoming','overdue','review','departures'):return jsonify(error='Filtro no válido'),400
  items=current_deadlines()
- if DEMO_MODE:
+ if DEMO_MODE and CLOUD_MODE:
   from demo_vessels import demo_operational_rows
   items.extend(demo_operational_rows())
  if mode=='upcoming':items=[x for x in items if not x.get('closure_due_to_90_days') and 0<=x['operational_remaining_days']<=30]
@@ -1777,7 +1778,7 @@ def dashboard():
  dates=current_deadlines()
  with conn() as c:total=c.execute('SELECT COUNT(*) FROM vessels').fetchone()[0]
  demo_total=0
- if DEMO_MODE:
+ if DEMO_MODE and CLOUD_MODE:
   from demo_vessels import demo_operational_rows,dbconnect
   dates.extend(demo_operational_rows())
   with dbconnect() as db:
@@ -1918,7 +1919,7 @@ def planned_alerts_for_day(today=None):
                  'vessel':r['name'],'category':'retorno_temporal',
                  'expiry_date':r['expiry_date'],'days_before':r['days_before'],
                  'recipients':['administracion'] if os.getenv('ADMIN_EMAIL','').strip() else []})
- if DEMO_MODE:
+ if DEMO_MODE and CLOUD_MODE:
   from demo_vessels import demo_reminders_for_day
   items.extend(demo_reminders_for_day(today))
  return {'date':today.isoformat(),'count':len(items),'configuration':mail_eligibility(),'items':items}
