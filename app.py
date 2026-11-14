@@ -75,7 +75,7 @@ def basic_protection():
   return jsonify(error='HTTPS obligatorio'),403
  if request.path == '/healthz' and not LAN_MODE:
   return None
- if DEMO_MODE and request.method not in ('GET','HEAD','OPTIONS') and request.path not in ('/api/push/subscribe','/api/push/unsubscribe','/api/push/test','/api/push/daily-check') and not (request.path == '/api/demo/vessels' or request.path.startswith('/api/demo/vessels/')):
+ if DEMO_MODE and request.method not in ('GET','HEAD','OPTIONS') and request.path not in ('/api/push/subscribe','/api/push/unsubscribe','/api/push/test','/api/push/daily-check','/api/push/demo-reminder-test') and not (request.path == '/api/demo/vessels' or request.path.startswith('/api/demo/vessels/')):
   return jsonify(error='DEMO GRATUITA: solo lectura. No se permiten modificaciones, importaciones ni envíos.'),403
  if LAN_MODE:
   from ipaddress import ip_address
