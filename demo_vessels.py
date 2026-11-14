@@ -173,6 +173,9 @@ def vessel_edit(vessel_id):
                         WHERE id=%s""",(vessel_id,)).fetchone()
                     if data[4] != existing_dates[0] or data[5] != existing_dates[1]:
                         return jsonify(error="Con movimientos registrados, las fechas deben corregirse desde el historial para conservar el recálculo"),400
+                    current_due=db.execute("SELECT due_date FROM servamar_demo_vessels WHERE id=%s",
+                                           (vessel_id,)).fetchone()[0]
+                    data=(*data[:6],current_due,data[7])
                 row = db.execute("""UPDATE servamar_demo_vessels SET
                     registration=%s,vessel_name=%s,captain=%s,stage=%s,entry_date=%s,
                     movement_date=%s,due_date=%s,notes=%s,version=version+1,updated_at=NOW()
