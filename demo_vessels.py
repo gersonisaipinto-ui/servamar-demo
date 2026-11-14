@@ -292,3 +292,63 @@ def demo_movement_history(vessel_id):
         "kind":r[0],"event_date":r[1].isoformat(),"stage_before":r[2],
         "due_before":r[3].isoformat() if r[3] else None,"stage_after":r[4],
         "due_after":r[5].isoformat() if r[5] else None} for r in rows])
+
+
+def demo_operational_rows(today=None):
+    """Read-only summary of *fictitious* PostgreSQL vessels for the demo dashboard."""
+    today=today or date.today()
+    with dbconnect() as db:
+        rows=db.execute("""SELECT id,registration,vessel_name,captain,stage,entry_date,
+            movement_date,due_date FROM servamar_demo_vessels
+            ORDER BY due_date NULLS LAST,id""").fetchall()
+    summary=[]
+    for id_,registration,name,captain,stage,entry,movement,deadline in rows:
+        # An open exit has a 90-day return deadline, not a permit expiry.
+        if stage=="cierre" or deadline is None:
+            continue
+        remaining=(deadline-today).days
+        is_exit=stage=="salida"
+        summary.append({
+            "id":id_,"name":name,"captain":captain,"declaration":registration,
+            "registration_number":registration,"stage":stage,
+            "permit_stage":stage,"expiry_date":deadline.isoformat(),
+            "remaining_days":remaining,"status":(
+                "Salida temporal" if is_exit and remaining>=0 else
+                "90 días fuera cumplidos" if is_exit else
+                "Vencido" if remaining<0 else "Vigente"),
+            "temporarily_away":is_exit,"operational_date":deadline.isoformat(),
+            "operational_remaining_days":remaining,
+            "closure_due_to_90_days":bool(is_exit and remaining<=0),
+            "date_quality":"confirmado","candidate_count":0,
+            "return_deadline":deadline.isoformat() if is_exit else None,
+            "return_days_left":remaining if is_exit else None,
+            "historical_departure":False,
+            "days_out":max(0,(today-movement).days) if is_exit else 0,
+            "demo_pg":True,"source":"PostgreSQL DEMO"
+        })
+    return summary
+
+
+def demo_reminders_for_day(today):
+    """Actual demo schedule rules, never customer contacts or operational vessel IDs."""
+    from datetime import timedelta
+    from app import due
+    items=[]
+    for row in demo_operational_rows(today):
+        deadline=date.fromisoformat(row["operational_date"])
+        exit_open=row["temporarily_away"]
+        if exit_open and row["closure_due_to_90_days"]:
+            continue
+        intervals=(30,15,7,1) if exit_open else (30,15,1)
+        for days in intervals:
+            notify=deadline-timedelta(days=days) if exit_open else due(deadline,days)
+            if notify==today:
+                items.append({
+                    "vessel_id":"demo-pg-"+str(row["id"]),
+                    "declaration":row["declaration"],"vessel":row["name"],
+                    "category":"retorno_temporal" if exit_open else "vencimiento",
+                    "expiry_date":deadline.isoformat(),"days_before":days,
+                    "recipients":["administracion"],"source":"PostgreSQL DEMO",
+                    "demo_pg":True
+                })
+    return items
