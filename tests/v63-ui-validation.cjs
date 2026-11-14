@@ -12,5 +12,5 @@ assert.match(js, /Cumple 90 días fuera/,'Temporary departure must have explicit
 assert.match(js, /td\.dataset\.label/,'Responsive table must expose field labels');
 assert.match(css, /\.dbdemo-vessels-table tbody\{display:grid/,'Mobile vessel cards');
 assert.match(html, /demo-vessels\.js\?v=63/,'JS cache version');
-assert.match(html, /style\.css\?v=65/,'CSS cache version');
+assert.match(html, /style\.css\?v=66/,'CSS cache version');
 console.log('V63 UI regression checks passed');
