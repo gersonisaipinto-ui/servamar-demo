@@ -55,7 +55,7 @@ function showTab(tab){
 }
 function showDetailPanel(){for(const name of ['inicio','nuevo','buscar','avisos','exportar','excel','bdpruebas']){const pane=$('tab-'+name);const tabbtn=document.querySelector('[data-tab="'+name+'"]');if(pane&&tabbtn){pane.hidden=true;tabbtn.classList.remove('active')}} $('detail').hidden=false}
 
-async function dashboard(){const v=await api('/api/dashboard');$('stats').innerHTML=[['Por vencer (30 días)',v.soon],['Vencidos (hist. incluidos)',v.expired],['Referencias históricas',v.review]].map(([k,n])=>`<div class="stat"><span>${k}</span><b>${n.toLocaleString('es-GT')}</b></div>`).join('')}
+async function dashboard(){const v=await api('/api/dashboard');const stats=[['Por vencer (30 días)',v.soon],['Vencidos (hist. incluidos)',v.expired],['Referencias históricas',v.review]];if(document.getElementById('tab-bdpruebas'))stats.push(['Registros persistentes DEMO',v.demo_pg_count||0]);$('stats').innerHTML=stats.map(([k,n])=>`<div class="stat"><span>${k}</span><b>${n.toLocaleString('es-GT')}</b></div>`).join('')}
 let lastSearchRequest=0;
 function clearSearch(){for(const id of ['search','vessel-name-search','registration-search','captainsearch','entrydate','entrymonth','expirydate','expirymonth'])$(id).value='';search()}
 // V39: Fila resumida con etapa, movimiento más reciente y plazo.
@@ -165,7 +165,7 @@ async function loadExpirations(){try{
  const mode=$('expiry-mode').value;
  const result=await api('/api/expirations?mode='+encodeURIComponent(mode));
  $('exp-csv').href='/api/expirations.csv?mode='+encodeURIComponent(mode);
- $('expmeta').textContent=`${result.total} registros ${mode==='overdue'?'vencidos':mode==='review'?'por verificar':mode==='departures'?'con salida temporal registrada':'con vencimiento dentro de los próximos 30 días'}${result.truncated?'; se muestran los primeros 200':''}. Las referencias históricas no generan correos automáticos.`;
+ $('expmeta').textContent=`${result.total} registros ${mode==='overdue'?'vencidos':mode==='review'?'por verificar':mode==='departures'?'con salida temporal registrada':'con vencimiento dentro de los próximos 30 días'}${result.truncated?'; se muestran los primeros 200':''}. Las referencias históricas no generan correos automáticos. ${document.getElementById('tab-bdpruebas')?'Los registros de PostgreSQL son ficticios y están identificados como DEMO. La descarga CSV tradicional aún no los incluye.':''}`;
  $('expresults').innerHTML=result.items.map(v=>{
   const stage=({'ingreso':'Ingreso 3 meses','ampliacion':'Ampliación 9 meses','deposito':'Depósito 12 meses','cierre':'Permiso Cerrado','salida':'Salida Temporal'})[v.stage]||v.stage||'Sin etapa';
   const departure=Boolean(v.temporarily_away);
@@ -176,10 +176,10 @@ async function loadExpirations(){try{
     const d=Number(v.operational_remaining_days??v.remaining_days);
     daysText=d<0?`${Math.abs(d)} días vencidos`:d===0?'Vence hoy':`${d} días restantes`;
   }
-  return `<tr><td>${escapeHtml(v.name)}</td><td>${escapeHtml(v.captain||"—")}</td><td>${escapeHtml(stage)}</td><td>${escapeHtml(daysText)}</td><td>${escapeHtml(formatDate(importantDate))}</td><td><button class="secondary" onclick="openVessel(${v.id})">Abrir</button></td></tr>`;
+  return `<tr><td>${escapeHtml(v.name)}${v.demo_pg?' (DEMO PostgreSQL)':''}</td><td>${escapeHtml(v.captain||"—")}</td><td>${escapeHtml(stage)}</td><td>${escapeHtml(daysText)}</td><td>${escapeHtml(formatDate(importantDate))}</td><td><button class="secondary" onclick="${v.demo_pg?'servamarDemoEditById':'openVessel'}(${v.id})">${v.demo_pg?'Editar prueba':'Abrir'}</button></td></tr>`;
  }).join('')||'<tr><td colspan="6" class="empty-state">No hay embarcaciones registradas en este filtro. Puedes crear una en «Nuevo ingreso» o importar tu Excel.</td></tr>';
  }catch(e){$('expmeta').textContent=e.message}}
-async function previewAlerts(){try{const j=await api('/api/alerts/preview');$('preview').textContent=`Hoy: ${j.count} recordatorios programados. ${j.items.map(x=>x.name+' ('+x.days_before+' días)').join('; ')||'Ninguno'}. Esta vista no envía correos.`;}catch(e){$('preview').textContent=e.message}}
+async function previewAlerts(){try{if(document.getElementById('tab-bdpruebas')){const j=await api('/api/push/schedule?days=1');const today=j.start;const items=j.events.filter(e=>e.notify_on===today);$('preview').textContent=`Hoy: ${items.length} recordatorio(s), incluyendo PostgreSQL DEMO. ${items.map(x=>x.vessel+' ('+x.days_before+' días)').join('; ')||'Ninguno'}. Vista previa sin envíos a clientes.`;return;}const j=await api('/api/alerts/preview');$('preview').textContent=`Hoy: ${j.count} recordatorios programados. ${j.items.map(x=>x.name+' ('+x.days_before+' días)').join('; ')||'Ninguno'}. Esta vista no envía correos.`;}catch(e){$('preview').textContent=e.message}}
 loadExpirations();
 
 let importFile=null;
