@@ -449,3 +449,32 @@ async function enableBrowserAlarms(){
 }
 window.addEventListener('load',()=>{refreshMobileAlarms();window.setInterval(()=>refreshMobileAlarms(),60000);});
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')refreshMobileAlarms();});
+
+
+/* V65: make dynamically rendered alert/review tables readable as Android cards. */
+function decorateDynamicMobileTables(containerId){
+ const root=$(containerId);if(!root)return;
+ for(const table of root.querySelectorAll('table')){
+  const headings=Array.from(table.querySelectorAll('thead th')).map(th=>th.textContent.trim());
+  if(!headings.length)continue;
+  table.classList.add('servamar-mobile-cards');
+  for(const row of table.querySelectorAll('tbody tr')){
+   const cells=Array.from(row.cells);
+   if(cells.length!==headings.length)continue;
+   cells.forEach((cell,i)=>cell.setAttribute('data-label',headings[i]||'Detalle'));
+  }
+ }
+}
+for(const [name,container] of [
+ ['showUpcomingAlerts','upcoming'],
+ ['showDateDiscrepancies','date-discrepancies'],
+ ['showReviewQueue','review-results'],
+ ['showRelated','review-results']
+]){
+ const original=globalThis[name];
+ if(typeof original==='function')globalThis[name]=async function(...args){
+  const result=await original.apply(this,args);
+  decorateDynamicMobileTables(container);
+  return result;
+ };
+}
