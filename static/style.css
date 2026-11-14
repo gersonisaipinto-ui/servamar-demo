@@ -199,3 +199,19 @@ button:disabled{opacity:.5;cursor:not-allowed}
  #tab-inicio .toolbar .actions{display:flex;flex-wrap:wrap}
  #tab-inicio .toolbar select{max-width:100%;width:100%}
 }
+
+/* V65: shared mobile cards for alerts, historical audits and related permits. */
+@media(max-width:650px){
+ #tab-avisos .tablewrap{max-height:none;overflow:visible;min-width:0}
+ #tab-avisos table.servamar-mobile-cards{display:block;min-width:0;width:100%;border:0}
+ #tab-avisos table.servamar-mobile-cards thead{display:none}
+ #tab-avisos table.servamar-mobile-cards tbody{display:grid;gap:12px;min-width:0}
+ #tab-avisos table.servamar-mobile-cards tbody tr{display:grid;gap:8px;min-width:0;padding:14px;border:1px solid #d5e3ec;border-radius:12px;background:#fff;box-shadow:0 2px 7px #1020300a}
+ #tab-avisos table.servamar-mobile-cards tbody td{display:grid;grid-template-columns:minmax(95px,38%) minmax(0,1fr);gap:9px;align-items:start;min-width:0;padding:2px 0;border:0;overflow-wrap:anywhere;white-space:normal;font-size:14px}
+ #tab-avisos table.servamar-mobile-cards tbody td::before{content:attr(data-label);font-weight:700;color:#536e80}
+ #tab-avisos table.servamar-mobile-cards tbody td:last-child:has(button){display:flex;gap:8px;flex-wrap:wrap}
+ #tab-avisos table.servamar-mobile-cards tbody td:last-child:has(button)::before{display:none}
+ #tab-avisos table.servamar-mobile-cards tbody td button{min-height:44px;flex:1 1 120px;margin:0}
+ #tab-avisos .panel{min-width:0}
+ #tab-avisos #review-results,#tab-avisos #date-discrepancies,#tab-avisos #upcoming{min-width:0}
+}
