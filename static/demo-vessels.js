@@ -120,6 +120,41 @@
        const p=document.createElement('p');
        p.textContent=fmt(m.event_date)+' · '+m.kind+' · '+m.stage_before+' → '+m.stage_after+' · vencimiento '+fmt(m.due_after);
        root.append(p);
+       const edit=document.createElement('button');
+       edit.type='button';edit.className='secondary';edit.textContent='Corregir';
+       edit.onclick=async()=>{
+         const newKind=prompt('Tipo de movimiento (ampliacion, deposito, salida, retorno, cierre):',m.kind);
+         if(newKind===null)return;
+         const newDate=prompt('Fecha del movimiento (dd/mm/yyyy):',fmt(m.event_date));
+         if(newDate===null)return;
+         try{
+           const payload={version:editing.version,kind:newKind.trim().toLowerCase(),event_date:iso(newDate)};
+           if(!confirm('¿Recalcular este movimiento y todos los posteriores? Se guardará una auditoría.'))return;
+           await api('/api/demo/vessels/'+editing.id+'/movements/'+m.id,'PATCH',payload);
+           const selectedId=editing.id;
+           await window.servamarDemoRefresh();
+           const updated=records.find(x=>x.id===selectedId);
+           if(updated)setRecord(updated);
+           await window.servamarDemoMovementHistory();
+           status('Movimiento corregido; historial y vencimientos recalculados.');
+         }catch(e){status(e.message,true);}
+       };
+       const del=document.createElement('button');
+       del.type='button';del.className='secondary';del.textContent='Eliminar movimiento';
+       del.style.marginLeft='6px';
+       del.onclick=async()=>{
+         if(!confirm('¿Eliminar este movimiento ficticio y recalcular los posteriores? La auditoría conservará el cambio.'))return;
+         try{
+           const selectedId=editing.id;
+           await api('/api/demo/vessels/'+selectedId+'/movements/'+m.id,'DELETE',{version:editing.version});
+           await window.servamarDemoRefresh();
+           const updated=records.find(x=>x.id===selectedId);
+           if(updated)setRecord(updated);
+           await window.servamarDemoMovementHistory();
+           status('Movimiento eliminado y vencimientos recalculados.');
+         }catch(e){status(e.message,true);}
+       };
+       root.append(edit,del);
      }
    }catch(e){root.textContent=e.message;}
  };
