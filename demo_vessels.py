@@ -166,6 +166,13 @@ def vessel_edit(vessel_id):
                     return jsonify(error="El registro cambió o fue eliminado; actualiza la lista"),409
                 if data[3] != current[0]:
                     return jsonify(error="Para cambiar de etapa utiliza Registrar movimiento; así conservamos su historial"),400
+                history_count=db.execute("""SELECT COUNT(*) FROM servamar_demo_movements
+                    WHERE vessel_id=%s""",(vessel_id,)).fetchone()[0]
+                if history_count:
+                    existing_dates=db.execute("""SELECT entry_date,movement_date FROM servamar_demo_vessels
+                        WHERE id=%s""",(vessel_id,)).fetchone()
+                    if data[4] != existing_dates[0] or data[5] != existing_dates[1]:
+                        return jsonify(error="Con movimientos registrados, las fechas deben corregirse desde el historial para conservar el recálculo"),400
                 row = db.execute("""UPDATE servamar_demo_vessels SET
                     registration=%s,vessel_name=%s,captain=%s,stage=%s,entry_date=%s,
                     movement_date=%s,due_date=%s,notes=%s,version=version+1,updated_at=NOW()
