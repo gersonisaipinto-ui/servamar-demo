@@ -157,3 +157,26 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .mobile-alarm-item span{font-size:13px;color:#526b78;overflow-wrap:anywhere}
 .alarm-disclaimer{font-size:12px;line-height:1.4;margin-bottom:0}
 @media(max-width:650px){.mobile-alarm-panel{padding:12px;margin:12px 0}.mobile-alarm-item{align-items:flex-start}.mobile-alarm-panel .actions{display:flex;flex-wrap:wrap}.mobile-alarm-panel button{max-width:100%}}
+
+/* V63: compact DEMO movement cards and accessible inline correction editor */
+#dbdemo-list{min-width:0}
+.dbdemo-history-item{padding:12px 0;border-bottom:1px solid #d9e5ec}
+.dbdemo-history-summary{margin:0 0 9px;line-height:1.5;overflow-wrap:anywhere}
+.dbdemo-history-actions,.dbdemo-correction-actions{display:flex;flex-wrap:wrap;gap:8px}
+.dbdemo-history-actions button{margin-left:0!important}
+.dbdemo-correction-form{margin:12px 0;padding:14px;border:1px solid #b9d0df;border-radius:12px;background:#f5fafc;display:grid;gap:12px}
+.dbdemo-correction-form label{display:grid;gap:6px;font-weight:600}
+.dbdemo-correction-form select,.dbdemo-correction-form input{width:100%;max-width:100%;box-sizing:border-box}
+.dbdemo-correction-error{color:#a32727;margin:0}
+@media(max-width:650px){
+ #dbdemo-list .dbdemo-vessels-table{display:block;min-width:0;width:100%;border:0}
+ #dbdemo-list .dbdemo-vessels-table thead{display:none}
+ #dbdemo-list .dbdemo-vessels-table tbody{display:grid;gap:12px}
+ #dbdemo-list .dbdemo-vessels-table tr{display:grid;gap:8px;padding:14px;border:1px solid #d5e3ec;border-radius:12px;background:#fff}
+ #dbdemo-list .dbdemo-vessels-table td{display:grid;grid-template-columns:minmax(100px,38%) minmax(0,1fr);gap:10px;align-items:start;border:0;padding:2px 0;min-width:0;overflow-wrap:anywhere}
+ #dbdemo-list .dbdemo-vessels-table td::before{content:attr(data-label);font-weight:700;color:#536e80}
+ #dbdemo-list .dbdemo-vessels-table td:last-child{display:flex;flex-wrap:wrap;gap:8px}
+ #dbdemo-list .dbdemo-vessels-table td:last-child::before{display:none}
+ #dbdemo-list .dbdemo-vessels-table td:last-child button{margin:0!important}
+ .dbdemo-correction-actions button{flex:1 1 140px}
+}
