@@ -90,6 +90,59 @@
      }
    }catch(e){root.replaceChildren();line(root,'No se pudo consultar el historial: '+e.message);}
  };
+ let simulatedEvents=[];
+ window.servamarLoadDemoSimulations=async()=>{
+   const select=document.getElementById('webpush-simulation-select');
+   const msg=document.getElementById('webpush-simulation-status');
+   if(!select||!msg)return;
+   select.replaceChildren();
+   msg.textContent='Buscando vencimientos ficticios en los próximos 60 días...';
+   try{
+     const data=await get('/api/push/schedule?days=60');
+     simulatedEvents=data.events.filter(e=>e.source==='PostgreSQL DEMO'&&e.vessel&&e.notify_on);
+     // Individual events may share a registration/date; group by that pair.
+     const unique=new Map();
+     for(const item of simulatedEvents){
+       const reg=item.registration||item.declaration||'';
+       if(reg)unique.set(reg+'|'+item.notify_on,item);
+     }
+     simulatedEvents=[...unique.values()];
+     const placeholder=document.createElement('option');
+     placeholder.value='';placeholder.textContent='Selecciona un aviso ficticio';
+     select.append(placeholder);
+     for(let i=0;i<simulatedEvents.length;i++){
+       const item=simulatedEvents[i],opt=document.createElement('option');
+       opt.value=String(i);
+       opt.textContent=formatDate(item.notify_on)+' · '+item.vessel+' · '+item.category+
+         ' · '+item.days_before+' día(s) antes';
+       select.append(opt);
+     }
+     msg.textContent=simulatedEvents.length+' aviso(s) de PostgreSQL DEMO disponibles. No se han enviado notificaciones.';
+   }catch(e){msg.textContent='No se pudo consultar los avisos: '+e.message;}
+ };
+ window.servamarRunDemoSimulation=async()=>{
+   const select=document.getElementById('webpush-simulation-select');
+   const msg=document.getElementById('webpush-simulation-status');
+   if(!select||!msg)return;
+   const i=Number(select.value);
+   const item=select.value!==''?simulatedEvents[i]:null;
+   if(!item){msg.textContent='Selecciona primero un aviso de PostgreSQL DEMO.';return;}
+   const reg=item.registration||item.declaration;
+   if(!reg||!reg.startsWith('DEMO-')){
+     msg.textContent='La agenda no proporcionó un registro ficticio válido. Actualiza los avisos.';
+     return;
+   }
+   if(!confirm('¿Enviar ahora una simulación de aviso del registro '+reg+
+     ' para el '+formatDate(item.notify_on)+'? Solo usa datos ficticios.'))return;
+   try{
+     const result=await post('/api/push/demo-reminder-test',{
+       registration:reg,notify_on:item.notify_on,confirmation:'SIMULAR'
+     });
+     msg.textContent='Regla comprobada: '+result.matched_alerts+' recordatorio(s). '+
+       result.accepted+' notificación(es) aceptada(s), '+result.skipped+
+       ' omitida(s) por duplicado, '+result.failed+' fallida(s). '+result.note;
+   }catch(e){msg.textContent='La simulación falló: '+e.message;}
+ };
  window.servamarDisableWebPush=async()=>{
   try{
    const reg=await navigator.serviceWorker.getRegistration('/');
