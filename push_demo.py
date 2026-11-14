@@ -395,7 +395,8 @@ def push_schedule():
                 "vessel":item.get("vessel") or "",
                 "category":item.get("category","vencimiento"),
                 "deadline":item.get("expiry_date"),
-                "days_before":item.get("days_before")
+                "days_before":item.get("days_before"),
+                "source":item.get("source","SQLite DEMO")
             })
     events.sort(key=lambda e:(e["notify_on"],e["vessel"],e["days_before"]))
     return jsonify(ok=True,start=now.isoformat(),through=(now+timedelta(days=horizon)).isoformat(),
