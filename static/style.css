@@ -215,3 +215,55 @@ button:disabled{opacity:.5;cursor:not-allowed}
  #tab-avisos .panel{min-width:0}
  #tab-avisos #review-results,#tab-avisos #date-discrepancies,#tab-avisos #upcoming{min-width:0}
 }
+
+/* V66 — Mobile-first forms, vessel details, and consistent touch controls.
+   Desktop styles remain unchanged. */
+@media(max-width:650px){
+ body{overflow-x:hidden}
+ main{padding:0 12px;margin-top:12px}
+ .tab-panel,.panel,.detail-panel,.detail-fold,.grid,.search-grid{min-width:0;max-width:100%}
+ .panel,.detail-panel{padding:15px;border-radius:14px}
+ .panel h2,.detail-panel h2{font-size:20px;line-height:1.25;overflow-wrap:anywhere}
+ .panel h3,.detail-panel h3{font-size:17px;line-height:1.35;overflow-wrap:anywhere}
+ .panel p,.detail-panel p,.detail-panel li{overflow-wrap:anywhere;line-height:1.5}
+ .grid,.search-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:14px}
+ .grid>.field,.search-grid>.field,.field.full{grid-column:1/-1;min-width:0}
+ .field{font-size:14px;line-height:1.4;min-width:0;gap:7px}
+ .field input,.field select,.field textarea,
+ #dbdemo-form input,#dbdemo-form select,#dbdemo-form textarea,
+ #dbdemo-movement-panel input,#dbdemo-movement-panel select,
+ #detail input,#detail select,#detail textarea{display:block;width:100%;min-width:0;max-width:100%;min-height:46px;font-size:16px;padding:11px 12px;border-radius:10px}
+ .field textarea,#detail textarea{min-height:90px}
+ #tab-nuevo input[type=file],#tab-excel input[type=file]{width:100%;max-width:100%;min-width:0;font-size:14px}
+ #tab-nuevo .actions,#tab-buscar .actions,#tab-exportar .actions,
+ #tab-excel .actions,#tab-avisos .actions,#tab-bdpruebas .actions,
+ #detail>.actions,#detail .toolbar .actions{display:grid;grid-template-columns:minmax(0,1fr);gap:9px;align-items:stretch}
+ #tab-nuevo .actions>button,#tab-buscar .actions>button,
+ #tab-exportar .actions>button,#tab-excel .actions>button,
+ #tab-avisos .actions>button,#tab-avisos .actions>a.button,
+ #tab-bdpruebas .actions>button,#tab-bdpruebas .actions>a.button,
+ #detail>.actions>button,#detail .toolbar button{
+   display:flex;justify-content:center;align-items:center;text-align:center;
+   width:100%;max-width:100%;min-width:0;min-height:46px;
+   padding:12px 14px;line-height:1.35;white-space:normal;overflow-wrap:anywhere;
+   font-size:14px;border-radius:11px
+ }
+ #tab-avisos .actions>a.button,#tab-bdpruebas .actions>a.button{text-decoration:none}
+ #tab-avisos .actions>select,#tab-bdpruebas .actions>select{width:100%;min-height:46px;font-size:16px}
+ #detail .toolbar{display:flex;flex-direction:column;align-items:stretch;gap:10px}
+ #detail .toolbar>div{min-width:0}
+ #detail .toolbar>button{width:100%;min-height:46px}
+ #detail .detail-fold{padding:13px;margin:12px 0;border-radius:12px}
+ #detail .detail-fold summary{line-height:1.45;overflow-wrap:anywhere}
+ #detail ul.history{max-height:none;padding-left:20px}
+ #detail ul.history li{padding:9px 0}
+ #detail .linked-permits button{white-space:normal;text-align:left;min-height:44px}
+ #dbdemo-form,#dbdemo-movement-panel{min-width:0}
+ #dbdemo-movement-panel{padding:14px;margin-top:16px}
+ #dbdemo-movement-panel .actions{display:grid;grid-template-columns:minmax(0,1fr);gap:9px}
+ #dbdemo-movement-panel .actions>button{width:100%;min-height:46px;white-space:normal}
+ #tab-exportar .grid,#tab-nuevo .grid,#tab-bdpruebas .grid{grid-template-columns:minmax(0,1fr)}
+ #tab-avisos .detail-fold{padding:12px}
+ #tab-avisos .detail-fold summary{line-height:1.45;overflow-wrap:anywhere}
+ #tab-excel pre{max-width:100%;white-space:pre-wrap;overflow-wrap:anywhere}
+}
