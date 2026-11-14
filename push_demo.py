@@ -443,6 +443,7 @@ def push_schedule():
             events.append({
                 "notify_on":target.isoformat(),
                 "vessel":item.get("vessel") or "",
+                "registration":item.get("declaration") if item.get("demo_pg") else None,
                 "category":item.get("category","vencimiento"),
                 "deadline":item.get("expiry_date"),
                 "days_before":item.get("days_before"),
