@@ -352,3 +352,150 @@ def demo_reminders_for_day(today):
                     "demo_pg":True
                 })
     return items
+
+
+def demo_export_records(rows):
+    """Map persisted DEMO rows into the existing SERVAMAR report columns."""
+    today=datetime.now(ZoneInfo("America/Guatemala")).date()
+    result=[]
+    for row in rows:
+        stage=row["stage"]
+        due_date=date.fromisoformat(row["due_date"]) if row["due_date"] else None
+        days=(due_date-today).days if due_date else None
+        status=("Permiso cerrado" if stage=="cierre" else
+                "Fuera de Guatemala" if stage=="salida" and days is not None and days>0 else
+                "90 días fuera cumplidos" if stage=="salida" else
+                "Vencido" if days is not None and days<0 else
+                "Vigente" if days is not None else "Sin plazo")
+        fmt=lambda v: (date.fromisoformat(v).strftime("%d/%m/%Y") if v else "")
+        # Prefixing text apostrophe in XLSX/CSV inputs prevents spreadsheet
+        # formula injection if untrusted text begins with =,+,-,@.
+        safe=lambda v: ("'"+v if str(v or "").startswith(("=","+","-","@")) else v)
+        result.append({
+            "declaration":safe(row["registration"]),
+            "name":safe(row["vessel_name"]),
+            "registration_number":safe(row["registration"]),
+            "captain":safe(row["captain"]),
+            "ingress":fmt(row["entry_date"]),
+            "expiry":fmt(row["due_date"]),
+            "stage":stage,
+            "status":status,
+            "remaining":days if days is not None else "",
+            "quality":"FICTICIO · PostgreSQL DEMO",
+            "email":""
+        })
+    return result
+
+
+def demo_export_filter(rows,period,field,start_raw="",end_raw=""):
+    """Filter and sort only demo rows; avoids historic operational exports."""
+    today=datetime.now(ZoneInfo("America/Guatemala")).date()
+    if field not in ("vencimiento","ingreso"):
+        raise ValueError("Campo de fecha inválido")
+    if period not in ("all","month","year","previous_year","next30","last30","custom"):
+        raise ValueError("Período inválido")
+    start=end=None
+    if period=="month":
+        start=today.replace(day=1)
+        end=add_months(start,1)-timedelta(days=1)
+    elif period=="year":
+        start,end=date(today.year,1,1),date(today.year,12,31)
+    elif period=="previous_year":
+        start,end=date(today.year-1,1,1),date(today.year-1,12,31)
+    elif period=="next30":
+        start,end=today,today+timedelta(days=30)
+    elif period=="last30":
+        start,end=today-timedelta(days=30),today
+    elif period=="custom":
+        try:
+            start=date.fromisoformat(start_raw)
+            end=date.fromisoformat(end_raw)
+        except (TypeError,ValueError):
+            raise ValueError("Ingresa ambas fechas válidas para el período personalizado")
+        if start>end: raise ValueError("La fecha inicial debe ser anterior o igual a la final")
+    filtered=[]
+    for row in rows:
+        value=row["entry_date"] if field=="ingreso" else row["due_date"]
+        if start is not None and (not value or not start<=date.fromisoformat(value)<=end):
+            continue
+        filtered.append(row)
+    return sorted(filtered,key=lambda r:(r["due_date"] is None,r["due_date"] or "9999-12-31",r["registration"]))
+
+
+@bp.get("/api/demo/export")
+def export_demo_control():
+    """Authentically formatted Excel/PDF generated only from stored DEMO data."""
+    from app import xlsx_bytes, pdf_bytes
+    from flask import send_file
+    import io
+    fmt=request.args.get("format","xlsx").lower()
+    if fmt not in ("xlsx","pdf"):
+        return jsonify(error="Formato de reporte inválido"),400
+    with dbconnect() as db:
+        values=db.execute(SELECT+" ORDER BY due_date NULLS LAST,id LIMIT 500").fetchall()
+    rows=[record(row) for row in values]
+    try:
+        selected=demo_export_filter(rows,request.args.get("period","all"),
+                     request.args.get("field","vencimiento"),
+                     request.args.get("from",""),request.args.get("to",""))
+    except ValueError as e:
+        return jsonify(error=str(e)),400
+    data=demo_export_records(selected)
+    label="SOLO DATOS FICTICIOS · PostgreSQL DEMO · "+request.args.get("period","all")
+    output=xlsx_bytes(data) if fmt=="xlsx" else pdf_bytes(data,label)
+    day=datetime.now(ZoneInfo("America/Guatemala")).strftime("%Y%m%d")
+    return send_file(io.BytesIO(output),as_attachment=True,
+        download_name=f"SERVAMAR_DEMO_Control_{day}.{fmt}",
+        mimetype=("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                  if fmt=="xlsx" else "application/pdf"))
+
+
+def demo_backup_payload():
+    """Portable JSON snapshot: demo vessel rows, movement history and audit only."""
+    with dbconnect() as db:
+        vessels=db.execute("""SELECT id,registration,vessel_name,captain,stage,
+            entry_date,movement_date,due_date,notes,version,created_at,updated_at
+            FROM servamar_demo_vessels ORDER BY id LIMIT 500""").fetchall()
+        movements=db.execute("""SELECT id,vessel_id,kind,event_date,stage_before,
+            due_before,stage_after,due_after,created_at
+            FROM servamar_demo_movements ORDER BY id LIMIT 10000""").fetchall()
+        audits=db.execute("""SELECT id,vessel_id,action,registration,at_time
+            FROM servamar_demo_vessel_audit ORDER BY id LIMIT 10000""").fetchall()
+    def stringify(rows,keys):
+        return [dict(zip(keys,(v.isoformat() if isinstance(v,(date,datetime)) else v for v in row)))
+                for row in rows]
+    return {
+        "format":"SERVAMAR-DEMO-BACKUP-V1",
+        "created_at":datetime.now(ZoneInfo("America/Guatemala")).isoformat(),
+        "scope":"Datos ficticios de PostgreSQL; NO contiene clientes, contraseñas, suscripciones push ni claves privadas",
+        "vessels":stringify(vessels,("id","registration","vessel_name","captain","stage",
+            "entry_date","movement_date","due_date","notes","version","created_at","updated_at")),
+        "movements":stringify(movements,("id","vessel_id","kind","event_date","stage_before",
+            "due_before","stage_after","due_after","created_at")),
+        "audit":stringify(audits,("id","vessel_id","action","registration","at_time"))
+    }
+
+
+@bp.get("/api/demo/backup")
+def download_demo_backup():
+    """Read-only snapshot. Never serialize push credentials or operational DB."""
+    from flask import send_file
+    import io,json,hashlib,zipfile
+    payload=demo_backup_payload()
+    raw=json.dumps(payload,ensure_ascii=False,sort_keys=True,indent=2).encode("utf-8")
+    metadata={
+        "format":payload["format"],"created_at":payload["created_at"],
+        "counts":{"vessels":len(payload["vessels"]),"movements":len(payload["movements"]),
+                  "audit":len(payload["audit"])},
+        "sha256_vessels_json":hashlib.sha256(raw).hexdigest(),
+        "restore_note":"Respaldo descargable de prueba. La restauración automática aún no está habilitada."
+    }
+    buf=io.BytesIO()
+    with zipfile.ZipFile(buf,"w",compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("demo_vessels.json",raw)
+        archive.writestr("manifest.json",json.dumps(metadata,ensure_ascii=False,indent=2))
+    buf.seek(0)
+    day=datetime.now(ZoneInfo("America/Guatemala")).strftime("%Y%m%d_%H%M")
+    return send_file(buf,as_attachment=True,
+                     download_name=f"SERVAMAR_DEMO_Respaldo_{day}.zip",
+                     mimetype="application/zip")
