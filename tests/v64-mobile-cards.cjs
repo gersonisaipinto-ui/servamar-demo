@@ -11,5 +11,5 @@ assert.match(css,/#tab-inicio table\.servamar-mobile-cards tbody tr/);
 assert.match(css,/#tab-buscar table\.servamar-mobile-cards tbody tr/);
 assert.match(css,/@media\(max-width:650px\)/);
 assert.match(html,/app\.js\?v=65/);
-assert.match(html,/style\.css\?v=65/);
+assert.match(html,/style\.css\?v=66/);
 console.log('V64 mobile home/search card checks passed');
