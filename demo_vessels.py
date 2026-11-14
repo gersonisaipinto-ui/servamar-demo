@@ -422,6 +422,29 @@ def demo_export_filter(rows,period,field,start_raw="",end_raw=""):
     return sorted(filtered,key=lambda r:(r["due_date"] is None,r["due_date"] or "9999-12-31",r["registration"]))
 
 
+@bp.get("/api/demo/export/preview")
+def preview_demo_control():
+    """Read-only preview using the same filters as the actual DEMO export."""
+    with dbconnect() as db:
+        values=db.execute(SELECT+" ORDER BY due_date NULLS LAST,id LIMIT 500").fetchall()
+    rows=[record(row) for row in values]
+    try:
+        selected=demo_export_filter(rows,request.args.get("period","all"),
+                     request.args.get("field","vencimiento"),
+                     request.args.get("from",""),request.args.get("to",""))
+    except ValueError as exc:
+        return jsonify(error=str(exc)),400
+    return jsonify(ok=True,count=len(selected),items=[{
+        "registration":r["registration"],
+        "vessel_name":r["vessel_name"],
+        "captain":r["captain"],
+        "stage":r["stage"],
+        "entry_date":date.fromisoformat(r["entry_date"]).strftime("%d/%m/%Y"),
+        "due_date":date.fromisoformat(r["due_date"]).strftime("%d/%m/%Y") if r["due_date"] else ""
+    } for r in selected[:20]],truncated=len(selected)>20,
+        source="PostgreSQL DEMO",period=request.args.get("period","all"))
+
+
 @bp.get("/api/demo/export")
 def export_demo_control():
     """Authentically formatted Excel/PDF generated only from stored DEMO data."""

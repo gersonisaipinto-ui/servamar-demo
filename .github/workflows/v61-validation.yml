@@ -1,0 +1,20 @@
+name: SERVAMAR V61 validation
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  report-preview-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install minimal dependencies
+        run: python -m pip install "Flask>=3,<4"
+      - name: Compile updated modules
+        run: python -m py_compile demo_vessels.py app.py tests/test_v61_report_preview.py
+      - name: Run report preview regression tests
+        run: python -m unittest discover -s tests -p 'test_v61_report_preview.py' -v
