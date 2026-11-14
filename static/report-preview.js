@@ -10,7 +10,7 @@ async function servamarDemoPreview() {
   });
   if (params.get('period') === 'custom') {
     const toISO = value => {
-      const match = /^(\\d{2})\\/(\\d{2})\\/(\\d{4})$/.exec(value.trim());
+      const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value.trim());
       if (!match) return '';
       const iso = match[3] + '-' + match[2] + '-' + match[1];
       const date = new Date(iso + 'T12:00:00Z');
