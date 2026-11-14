@@ -56,6 +56,17 @@ function showTab(tab){
 function showDetailPanel(){for(const name of ['inicio','nuevo','buscar','avisos','exportar','excel','bdpruebas']){const pane=$('tab-'+name);const tabbtn=document.querySelector('[data-tab="'+name+'"]');if(pane&&tabbtn){pane.hidden=true;tabbtn.classList.remove('active')}} $('detail').hidden=false}
 
 async function dashboard(){const v=await api('/api/dashboard');const stats=[['Por vencer (30 días)',v.soon],['Vencidos (hist. incluidos)',v.expired],['Referencias históricas',v.review]];if(document.getElementById('tab-bdpruebas'))stats.push(['Registros persistentes DEMO',v.demo_pg_count||0]);$('stats').innerHTML=stats.map(([k,n])=>`<div class="stat"><span>${k}</span><b>${n.toLocaleString('es-GT')}</b></div>`).join('')}
+
+// V64: preserve semantic tables on desktop; label cells for mobile cards.
+function labelMobileTableRows(tbodyId, labels){
+ const body=$(tbodyId);if(!body)return;
+ const table=body.closest('table');if(table)table.classList.add('servamar-mobile-cards');
+ for(const row of body.rows){
+  if(row.cells.length!==labels.length)continue; // Empty-state rows with colspan stay readable.
+  for(let i=0;i<labels.length;i++)row.cells[i].setAttribute('data-label',labels[i]);
+ }
+}
+
 let lastSearchRequest=0;
 function clearSearch(){for(const id of ['search','vessel-name-search','registration-search','captainsearch','entrydate','entrymonth','expirydate','expirymonth'])$(id).value='';search()}
 // V39: Fila resumida con etapa, movimiento más reciente y plazo.
@@ -106,6 +117,7 @@ async function search(){
   const original=result.items.map(v=>`<tr><td>${escapeHtml(v.name)}</td><td>${escapeHtml(v.declaration)}</td><td>${escapeHtml(v.registration_number||'—')}</td><td>${escapeHtml(v.captain)}</td><td>${escapeHtml(compactStage(v))}</td><td>${escapeHtml(formatDate(v.last_movement_date))}</td><td>${escapeHtml(compactTerm(v))}</td><td><button class="secondary" onclick="openVessel(${v.id})">Abrir (solo lectura)</button></td></tr>`).join('');
   const demoRows=demo.map(v=>`<tr><td>${escapeHtml(v.vessel_name)} (DEMO)</td><td>${escapeHtml(v.registration)}</td><td>Prueba PostgreSQL</td><td>${escapeHtml(v.captain)}</td><td>${escapeHtml(v.stage)}</td><td>${escapeHtml(formatDate(v.movement_date))}</td><td>${escapeHtml(formatDate(v.due_date))}</td><td><button class="secondary" onclick="servamarDemoEditById(${v.id})">Editar en prueba</button></td></tr>`).join('');
   $('results').innerHTML=original+demoRows||'<tr><td colspan="8">No se encontraron embarcaciones con estos filtros.</td></tr>';
+  labelMobileTableRows('results',['Embarcación','Declaración','Registro','Capitán','Etapa','Último movimiento','Plazo','Acciones']);
  }catch(e){if(requestNumber===lastSearchRequest){root.textContent=e.message;$('results').innerHTML=''}}
 }
 function renderStatusBanner(v,cd,archivedClosure){
@@ -178,6 +190,7 @@ async function loadExpirations(){try{
   }
   return `<tr><td>${escapeHtml(v.name)}${v.demo_pg?' (DEMO PostgreSQL)':''}</td><td>${escapeHtml(v.captain||"—")}</td><td>${escapeHtml(stage)}</td><td>${escapeHtml(daysText)}</td><td>${escapeHtml(formatDate(importantDate))}</td><td><button class="secondary" onclick="${v.demo_pg?'servamarDemoEditById':'openVessel'}(${v.id})">${v.demo_pg?'Editar prueba':'Abrir'}</button></td></tr>`;
  }).join('')||'<tr><td colspan="6" class="empty-state">No hay embarcaciones registradas en este filtro. Puedes crear una en «Nuevo ingreso» o importar tu Excel.</td></tr>';
+ labelMobileTableRows('expresults',['Embarcación','Capitán','Etapa','Plazo','Fecha','Acciones']);
  }catch(e){$('expmeta').textContent=e.message}}
 async function previewAlerts(){try{if(document.getElementById('tab-bdpruebas')){const j=await api('/api/push/schedule?days=1');const today=j.start;const items=j.events.filter(e=>e.notify_on===today);$('preview').textContent=`Hoy: ${items.length} recordatorio(s), incluyendo PostgreSQL DEMO. ${items.map(x=>x.vessel+' ('+x.days_before+' días)').join('; ')||'Ninguno'}. Vista previa sin envíos a clientes.`;return;}const j=await api('/api/alerts/preview');$('preview').textContent=`Hoy: ${j.count} recordatorios programados. ${j.items.map(x=>x.name+' ('+x.days_before+' días)').join('; ')||'Ninguno'}. Esta vista no envía correos.`;}catch(e){$('preview').textContent=e.message}}
 loadExpirations();
