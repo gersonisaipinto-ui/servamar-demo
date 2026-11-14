@@ -133,5 +133,41 @@
    }
   }catch(e){target.textContent=e.message;}
  };
+ window.servamarDemoDownload=async(format)=>{
+  const status=document.getElementById('dbdemo-export-status');
+  if(!status)return;
+  status.textContent='Generando reporte de PostgreSQL DEMO...';
+  try{
+    const period=document.getElementById('report-period').value;
+    const field=document.getElementById('report-field').value;
+    const query=new URLSearchParams({format,period,field});
+    if(period==='custom'){
+      query.set('from',iso(document.getElementById('report-from').value));
+      query.set('to',iso(document.getElementById('report-to').value));
+    }
+    const response=await fetch('/api/demo/export?'+query.toString(),{credentials:'same-origin'});
+    if(!response.ok){
+      const result=await response.json().catch(()=>({error:'Error HTTP '+response.status}));
+      throw Error(result.error||'No fue posible crear el reporte');
+    }
+    const blob=await response.blob(),url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;a.download='SERVAMAR_DEMO_Control.'+format;
+    document.body.append(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),60000);
+    status.textContent='Reporte PostgreSQL DEMO generado. Solo contiene datos ficticios.';
+  }catch(e){status.textContent='Error: '+e.message;}
+ };
+ window.servamarDemoBackupStatus=async()=>{
+  const element=document.getElementById('dbdemo-backup-status');
+  if(!element)return;
+  element.textContent='Consultando las tablas de prueba...';
+  try{
+    const r=await api('/api/demo/backup/status');
+    element.textContent='Respaldo disponible: '+r.counts.vessels+' embarcaciones ficticias, '+
+      r.counts.movements+' movimientos y '+r.counts.audit+' registros de auditoría. '+
+      'No contiene datos operativos ni claves push.';
+  }catch(e){element.textContent='No se pudo verificar el respaldo: '+e.message;}
+ };
  window.servamarDemoInit=()=>{setRecord(null);window.servamarDemoRefresh();};
 })();
