@@ -9,6 +9,10 @@
    const r=await fetch(path,{method,credentials:'same-origin',headers:{'Accept':'application/json','Content-Type':'application/json'},...(payload?{body:JSON.stringify(payload)}:{})});
    const j=await r.json();if(!r.ok)throw Error(j.error||('Error '+r.status));return j;
  };
+ const stageNames={ingreso:'Ingreso inicial',ampliacion:'Ampliación',deposito:'Depósito aduanero',salida:'Salida temporal',cierre:'Permiso cerrado'};
+ const movementNames={ampliacion:'Ampliación',deposito:'Ingreso a depósito',salida:'Salida temporal',retorno:'Retorno de salida temporal',cierre:'Cierre del permiso'};
+ const dueLabel=r=>r.stage==='salida'?'Cumple 90 días fuera':r.stage==='cierre'?'Permiso cerrado':'Vencimiento';
+ const dueText=r=>r.stage==='cierre'?'Permiso cerrado':fmt(r.due_date);
  const fields=['registration','vessel_name','captain','stage','entry_date','movement_date','notes'];
  const values=()=>{
   const obj={};
@@ -26,14 +30,14 @@
   $('dbdemo-movement-panel').hidden=!r;
   $('dbdemo-movement-history').replaceChildren();
   if(r){
-    $('dbdemo-movement-selected').textContent=r.registration+' · '+r.vessel_name+' · etapa actual: '+r.stage+' · vencimiento: '+fmt(r.due_date);
+    $('dbdemo-movement-selected').textContent=r.registration+' · '+r.vessel_name+' · etapa actual: '+(stageNames[r.stage]||r.stage)+' · '+dueLabel(r)+': '+dueText(r);
     $('dbdemo-movement-event').value=fmt(r.movement_date);
   }
   status(r?'Editando '+r.registration+'.':'Solo datos inventados. Este laboratorio no modifica la base operativa.');
  };
  const render=()=>{
   const box=$('dbdemo-list');box.replaceChildren();
-  const table=document.createElement('table');const head=document.createElement('thead');
+  const table=document.createElement('table');table.className='dbdemo-vessels-table';const head=document.createElement('thead');
   const tr=document.createElement('tr');
   for(const label of ['Registro','Embarcación','Capitán','Etapa','Vencimiento','Acciones']){
    const th=document.createElement('th');th.textContent=label;tr.append(th);
@@ -41,10 +45,10 @@
   const body=document.createElement('tbody');
   for(const r of records){
     const row=document.createElement('tr');
-    for(const val of [r.registration,r.vessel_name,r.captain,r.stage,fmt(r.due_date)]){
-      const td=document.createElement('td');td.textContent=val;row.append(td);
+    for(const [index,val] of [r.registration,r.vessel_name,r.captain,stageNames[r.stage]||r.stage,dueText(r)].entries()){
+      const td=document.createElement('td');td.dataset.label=['Registro','Embarcación','Capitán','Etapa',dueLabel(r)][index];td.textContent=val;row.append(td);
     }
-    const actions=document.createElement('td');
+    const actions=document.createElement('td');actions.dataset.label='Acciones';
     const edit=document.createElement('button');edit.type='button';edit.className='secondary';edit.textContent='Editar';edit.onclick=()=>{setRecord(r);$('dbdemo-form').scrollIntoView({behavior:'smooth'});};
     const del=document.createElement('button');del.type='button';del.className='secondary';del.textContent='Eliminar';del.style.marginLeft='6px';
     del.onclick=async()=>{
@@ -101,13 +105,13 @@
        event_date:iso($('dbdemo-movement-event').value),version:editing.version};
      if(!confirm('¿Registrar movimiento '+data.kind+' del '+editing.registration+'? Solo afecta el laboratorio.'))return;
      const r=await api('/api/demo/vessels/'+editing.id+'/movement','POST',data);
-     msg.textContent='Movimiento guardado. Nuevo estado: '+r.stage+' · vencimiento: '+fmt(r.due_date)+'.';
+     msg.textContent='Movimiento guardado. Nuevo estado: '+(stageNames[r.stage]||r.stage)+' · '+dueLabel(r)+': '+dueText(r)+'.';
      const selectedId=editing.id;
      await window.servamarDemoRefresh();
      const updated=records.find(v=>v.id===selectedId);
      if(updated)setRecord(updated);
      await window.servamarDemoMovementHistory();
-     msg.textContent='Movimiento registrado correctamente. '+(r.due_date?'Vencimiento: '+fmt(r.due_date):'Permiso cerrado.');
+     msg.textContent='Movimiento registrado correctamente. '+dueLabel(r)+': '+dueText(r)+'.';
    }catch(e){msg.textContent='Error: '+e.message;}
  };
  window.servamarDemoMovementHistory=async()=>{
@@ -117,27 +121,50 @@
      const j=await api('/api/demo/vessels/'+editing.id+'/movements');
      if(!j.items.length){root.textContent='Sin movimientos posteriores al ingreso.';return;}
      for(const m of j.items){
-       const p=document.createElement('p');
-       p.textContent=fmt(m.event_date)+' · '+m.kind+' · '+m.stage_before+' → '+m.stage_after+' · vencimiento '+fmt(m.due_after);
-       root.append(p);
+       const item=document.createElement('section');item.className='dbdemo-history-item';
+       const p=document.createElement('p');p.className='dbdemo-history-summary';
+       const nextLabel=m.stage_after==='salida'?'Cumple 90 días fuera':m.stage_after==='cierre'?'Permiso cerrado':'Vencimiento';
+       p.textContent=fmt(m.event_date)+' · '+(movementNames[m.kind]||m.kind)+' · '+(stageNames[m.stage_before]||m.stage_before)+' → '+(stageNames[m.stage_after]||m.stage_after)+' · '+nextLabel+': '+fmt(m.due_after);
+       item.append(p);
        const edit=document.createElement('button');
        edit.type='button';edit.className='secondary';edit.textContent='Corregir';
-       edit.onclick=async()=>{
-         const newKind=prompt('Tipo de movimiento (ampliacion, deposito, salida, retorno, cierre):',m.kind);
-         if(newKind===null)return;
-         const newDate=prompt('Fecha del movimiento (dd/mm/yyyy):',fmt(m.event_date));
-         if(newDate===null)return;
-         try{
-           const payload={version:editing.version,kind:newKind.trim().toLowerCase(),event_date:iso(newDate)};
-           if(!confirm('¿Recalcular este movimiento y todos los posteriores? Se guardará una auditoría.'))return;
-           await api('/api/demo/vessels/'+editing.id+'/movements/'+m.id,'PATCH',payload);
-           const selectedId=editing.id;
-           await window.servamarDemoRefresh();
-           const updated=records.find(x=>x.id===selectedId);
-           if(updated)setRecord(updated);
-           await window.servamarDemoMovementHistory();
-           status('Movimiento corregido; historial y vencimientos recalculados.');
-         }catch(e){status(e.message,true);}
+       edit.onclick=()=>{
+         const existing=item.querySelector('.dbdemo-correction-form');
+         if(existing){existing.remove();return;}
+         const form=document.createElement('form');form.className='dbdemo-correction-form';
+         const kindLabel=document.createElement('label');kindLabel.textContent='Tipo de movimiento';
+         const select=document.createElement('select');select.required=true;
+         for(const [value,label] of Object.entries(movementNames)){
+           const option=document.createElement('option');option.value=value;option.textContent=label;select.append(option);
+         }
+         select.value=m.kind;kindLabel.append(select);
+         const dateLabel=document.createElement('label');dateLabel.textContent='Fecha del movimiento (dd/mm/yyyy)';
+         const dateInput=document.createElement('input');dateInput.type='text';dateInput.inputMode='numeric';
+         dateInput.placeholder='dd/mm/yyyy';dateInput.maxLength=10;dateInput.required=true;dateInput.value=fmt(m.event_date);
+         dateLabel.append(dateInput);
+         const actions=document.createElement('div');actions.className='dbdemo-correction-actions';
+         const save=document.createElement('button');save.type='submit';save.textContent='Guardar corrección';
+         const cancel=document.createElement('button');cancel.type='button';cancel.className='secondary';cancel.textContent='Cancelar';
+         cancel.onclick=()=>form.remove();actions.append(save,cancel);
+         const error=document.createElement('p');error.className='dbdemo-correction-error';error.setAttribute('role','alert');
+         form.append(kindLabel,dateLabel,actions,error);
+         form.onsubmit=async event=>{
+           event.preventDefault();error.textContent='';
+           try{
+             const payload={version:editing.version,kind:select.value,event_date:iso(dateInput.value)};
+             if(!confirm('¿Guardar la corrección y recalcular los movimientos posteriores?'))return;
+             save.disabled=true;
+             const selectedId=editing.id;
+             await api('/api/demo/vessels/'+selectedId+'/movements/'+m.id,'PATCH',payload);
+             await window.servamarDemoRefresh();
+             const updated=records.find(x=>x.id===selectedId);
+             if(updated)setRecord(updated);
+             await window.servamarDemoMovementHistory();
+             status('Movimiento corregido; historial y vencimientos recalculados.');
+           }catch(e){error.textContent=e.message;save.disabled=false;}
+         };
+         item.append(form);
+         select.focus();
        };
        const del=document.createElement('button');
        del.type='button';del.className='secondary';del.textContent='Eliminar movimiento';
@@ -154,7 +181,7 @@
            status('Movimiento eliminado y vencimientos recalculados.');
          }catch(e){status(e.message,true);}
        };
-       root.append(edit,del);
+       const controls=document.createElement('div');controls.className='dbdemo-history-actions';controls.append(edit,del);item.append(controls);root.append(item);
      }
    }catch(e){root.textContent=e.message;}
  };
