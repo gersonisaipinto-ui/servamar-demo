@@ -285,13 +285,108 @@ def add_demo_movement(vessel_id):
 @bp.get("/api/demo/vessels/<int:vessel_id>/movements")
 def demo_movement_history(vessel_id):
     with dbconnect() as db:
-        rows=db.execute("""SELECT kind,event_date,stage_before,due_before,stage_after,due_after
+        rows=db.execute("""SELECT id,kind,event_date,stage_before,due_before,stage_after,due_after
             FROM servamar_demo_movements WHERE vessel_id=%s ORDER BY id DESC LIMIT 50""",
             (vessel_id,)).fetchall()
     return jsonify(ok=True,items=[{
-        "kind":r[0],"event_date":r[1].isoformat(),"stage_before":r[2],
-        "due_before":r[3].isoformat() if r[3] else None,"stage_after":r[4],
-        "due_after":r[5].isoformat() if r[5] else None} for r in rows])
+        "id":r[0],"kind":r[1],"event_date":r[2].isoformat(),"stage_before":r[3],
+        "due_before":r[4].isoformat() if r[4] else None,"stage_after":r[5],
+        "due_after":r[6].isoformat() if r[6] else None} for r in rows])
+
+
+
+@bp.route("/api/demo/vessels/<int:vessel_id>/movements/<int:movement_id>", methods=["PATCH", "DELETE"])
+def correct_demo_movement(vessel_id, movement_id):
+    """Transactional correction; reject legacy histories that cannot be replayed safely."""
+    from demo_movement_replay import replay_movements
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify(error="Se requiere JSON con la versión del expediente"), 400
+    try:
+        expected = int(payload.get("version"))
+        if expected < 1:
+            raise ValueError()
+        if request.method == "PATCH":
+            kind = str(payload.get("kind") or "").strip().lower()
+            event_date = date.fromisoformat(str(payload.get("event_date") or ""))
+            if not 2000 <= event_date.year <= 2100:
+                raise ValueError()
+    except (ValueError, TypeError):
+        return jsonify(error="Versión, tipo o fecha inválidos"), 400
+    with dbconnect() as db:
+        vessel = db.execute("""SELECT registration,stage,due_date,entry_date,movement_date,version
+            FROM servamar_demo_vessels WHERE id=%s FOR UPDATE""", (vessel_id,)).fetchone()
+        if vessel is None:
+            return jsonify(error="Expediente DEMO no encontrado"), 404
+        registration, stage, due, entry, last_date, version = vessel
+        if version != expected:
+            return jsonify(error="El expediente cambió. Actualiza la lista antes de corregir"), 409
+        raw = db.execute("""SELECT id,kind,event_date,stage_before,due_before,stage_after,due_after
+            FROM servamar_demo_movements WHERE vessel_id=%s ORDER BY id FOR UPDATE""",
+            (vessel_id,)).fetchall()
+        if not any(row[0] == movement_id for row in raw):
+            return jsonify(error="Movimiento no encontrado"), 404
+        # Legacy records could have been created directly in a non-entry stage or
+        # edited manually; never silently overwrite a state that disagrees with replay.
+        original = [{"kind": row[1], "event_date": row[2]} for row in raw]
+        try:
+            before = replay_movements(entry, original)
+        except (ValueError, KeyError):
+            return jsonify(error="Historial anterior incompatible: requiere revisión manual"), 409
+        if (before["stage"], before["due_date"], before["movement_date"]) != (stage, due, last_date):
+            return jsonify(error="El estado almacenado no coincide con el historial; corrección bloqueada"), 409
+        modified = []
+        for row in raw:
+            if row[0] == movement_id:
+                if request.method == "PATCH":
+                    modified.append({"kind": kind, "event_date": event_date})
+            else:
+                modified.append({"kind": row[1], "event_date": row[2]})
+        try:
+            after = replay_movements(entry, modified)
+        except (ValueError, KeyError) as exc:
+            return jsonify(error="Corrección incompatible con movimientos posteriores: " + str(exc)), 400
+        # Preserve existing IDs and recalculate all surviving downstream snapshots.
+        db.execute("""CREATE TABLE IF NOT EXISTS servamar_demo_movement_corrections (
+            id BIGSERIAL PRIMARY KEY, vessel_id BIGINT NOT NULL,
+            movement_id BIGINT NOT NULL, action TEXT NOT NULL,
+            registration TEXT NOT NULL, before_state JSONB NOT NULL,
+            after_state JSONB NOT NULL, at_time TIMESTAMPTZ NOT NULL DEFAULT NOW())""")
+        import json
+        def snapshot(items):
+            return json.dumps([{"id": item[0], "kind": item[1],
+                "event_date": item[2].isoformat()} for item in items])
+        new_rows = [(row[0], item["kind"], item["event_date"])
+                    for row in raw if row[0] != movement_id or request.method == "PATCH"
+                    for item in [({"kind": kind, "event_date": event_date}
+                                 if row[0] == movement_id else
+                                 {"kind": row[1], "event_date": row[2]})]]
+        if request.method == "DELETE":
+            db.execute("DELETE FROM servamar_demo_movements WHERE id=%s AND vessel_id=%s",
+                       (movement_id, vessel_id))
+        for row, state in zip(new_rows, after["history"]):
+            db.execute("""UPDATE servamar_demo_movements SET kind=%s,event_date=%s,
+                stage_before=%s,due_before=%s,stage_after=%s,due_after=%s
+                WHERE id=%s AND vessel_id=%s""",
+                (state["kind"], state["event_date"], state["stage_before"],
+                 state["due_before"], state["stage_after"], state["due_after"],
+                 row[0], vessel_id))
+        db.execute("""UPDATE servamar_demo_vessels SET stage=%s,due_date=%s,
+            movement_date=%s,version=version+1,updated_at=NOW() WHERE id=%s""",
+            (after["stage"], after["due_date"], after["movement_date"], vessel_id))
+        db.execute("""INSERT INTO servamar_demo_movement_corrections
+            (vessel_id,movement_id,action,registration,before_state,after_state)
+            VALUES(%s,%s,%s,%s,%s::jsonb,%s::jsonb)""",
+            (vessel_id, movement_id, "edit" if request.method == "PATCH" else "delete",
+             registration, snapshot(raw), json.dumps([
+                 {"id": row[0], "kind": row[1], "event_date": row[2].isoformat()}
+                 for row in new_rows])))
+        db.execute("""INSERT INTO servamar_demo_vessel_audit(vessel_id,action,registration)
+            VALUES(%s,%s,%s)""", (vessel_id,
+            "movement_correct" if request.method == "PATCH" else "movement_delete", registration))
+    return jsonify(ok=True, stage=after["stage"],
+                   due_date=after["due_date"].isoformat() if after["due_date"] else None,
+                   version=version + 1, movements=len(new_rows))
 
 
 def demo_operational_rows(today=None):
