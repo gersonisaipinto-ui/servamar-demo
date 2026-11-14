@@ -476,6 +476,19 @@ def demo_backup_payload():
     }
 
 
+@bp.get("/api/demo/backup/status")
+def demo_backup_status():
+    """Read-only count check; no secret or subscription details."""
+    with dbconnect() as db:
+        counts={
+            "vessels":db.execute("SELECT COUNT(*) FROM servamar_demo_vessels").fetchone()[0],
+            "movements":db.execute("SELECT COUNT(*) FROM servamar_demo_movements").fetchone()[0],
+            "audit":db.execute("SELECT COUNT(*) FROM servamar_demo_vessel_audit").fetchone()[0],
+        }
+    return jsonify(ok=True,counts=counts,format="SERVAMAR-DEMO-BACKUP-V1",
+                   note="Solo tablas ficticias; restauración automática no disponible")
+
+
 @bp.get("/api/demo/backup")
 def download_demo_backup():
     """Read-only snapshot. Never serialize push credentials or operational DB."""
