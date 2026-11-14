@@ -80,6 +80,8 @@
 <div style="border-top:1px solid #d5dfeb;margin-top:18px;padding-top:14px">
 <h3>Reportes de PostgreSQL DEMO</h3>
 <p class="muted">Estos archivos contienen solamente las embarcaciones ficticias persistentes y respetan el período y el filtro de fecha seleccionados arriba. Los reportes anteriores corresponden a los ejemplos de la base temporal y no incluyen PostgreSQL.</p>
+<div class="actions"><button type="button" class="secondary" onclick="servamarDemoPreview()">Vista previa PostgreSQL DEMO</button></div>
+<div id="dbdemo-preview" class="muted" aria-live="polite">Selecciona el período y pulsa Vista previa para consultar los registros antes de exportar.</div>
 <div class="actions">
 <button type="button" onclick="servamarDemoDownload('xlsx')">Descargar Excel PostgreSQL DEMO</button>
 <button type="button" class="secondary" onclick="servamarDemoDownload('pdf')">Descargar PDF PostgreSQL DEMO</button>
@@ -149,4 +151,4 @@
 </section></section>
 {% endif %}
 <section id="detail" class="panel detail-panel" hidden></section>
-</main><footer>Fechas en dd/mm/yyyy · Los avisos a clientes requieren correo válido, consentimiento y confirmación del envío.</footer><script src="/static/app.js?v=62"></script><script src="/static/date-inputs.js?v=58" defer></script><script src="/static/push-demo.js?v=66" defer></script>{% if demo_mode %}<script src="/static/demo-vessels.js?v=4" defer></script>{% endif %}</body></html>
+</main><footer>Fechas en dd/mm/yyyy · Los avisos a clientes requieren correo válido, consentimiento y confirmación del envío.</footer><script src="/static/app.js?v=62"></script><script src="/static/date-inputs.js?v=58" defer></script><script src="/static/push-demo.js?v=66" defer></script>{% if demo_mode %}<script src="/static/demo-vessels.js?v=4" defer></script><script src="/static/report-preview.js?v=61" defer></script>{% endif %}</body></html>
