@@ -49,6 +49,18 @@
 <div class="actions"><button class="secondary" type="button" onclick="servamarLoadPushSchedule()">Ver próximos recordatorios (45 días)</button>
 <button class="secondary" type="button" onclick="servamarLoadPushHistory()">Historial de notificaciones</button></div>
 <div id="webpush-schedule" class="muted" aria-live="polite"></div>
+{% if demo_mode %}
+<section style="padding:12px 0;border-top:1px solid #d5dfeb;margin-top:12px">
+<h4>Simular un recordatorio de PostgreSQL</h4>
+<p class="muted">Selecciona un vencimiento ficticio futuro. SERVAMAR verificará la regla y enviará un aviso push genérico inmediatamente a Windows y Android. No cambia fechas ni envía correos. Repetir la misma prueba no duplica el aviso en un mismo dispositivo.</p>
+<div class="actions">
+<select id="webpush-simulation-select" aria-label="Recordatorio ficticio para simular"><option value="">Pulsa Cargar avisos de prueba</option></select>
+<button class="secondary" type="button" onclick="servamarLoadDemoSimulations()">Cargar avisos de prueba</button>
+<button type="button" onclick="servamarRunDemoSimulation()">Simular y enviar aviso</button>
+</div>
+<p id="webpush-simulation-status" class="muted" aria-live="polite"></p>
+</section>
+{% endif %}
 <div id="webpush-history" class="muted" aria-live="polite"></div>
 </section>
 <section class="panel"><h2>Avisos y respaldos</h2><p class="muted">Revisa recordatorios y descarga copias de seguridad. Para enviar un correo manual: Buscar → abrir ficha → Enviar correo ahora. Primero guarda el correo y consentimiento en esa ficha.</p>
@@ -119,4 +131,4 @@
 </section></section>
 {% endif %}
 <section id="detail" class="panel detail-panel" hidden></section>
-</main><footer>Fechas en dd/mm/yyyy · Los avisos a clientes requieren correo válido, consentimiento y confirmación del envío.</footer><script src="/static/app.js?v=62"></script><script src="/static/date-inputs.js?v=58" defer></script><script src="/static/push-demo.js?v=65" defer></script>{% if demo_mode %}<script src="/static/demo-vessels.js?v=3" defer></script>{% endif %}</body></html>
+</main><footer>Fechas en dd/mm/yyyy · Los avisos a clientes requieren correo válido, consentimiento y confirmación del envío.</footer><script src="/static/app.js?v=62"></script><script src="/static/date-inputs.js?v=58" defer></script><script src="/static/push-demo.js?v=66" defer></script>{% if demo_mode %}<script src="/static/demo-vessels.js?v=3" defer></script>{% endif %}</body></html>
