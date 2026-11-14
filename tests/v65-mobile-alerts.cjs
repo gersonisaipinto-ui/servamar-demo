@@ -1,0 +1,11 @@
+const assert=require('node:assert/strict'),fs=require('node:fs');
+const js=fs.readFileSync('static/app.js','utf8'),css=fs.readFileSync('static/style.css','utf8'),html=fs.readFileSync('templates/index.html','utf8');
+assert.match(js,/function decorateDynamicMobileTables\(containerId\)/);
+for(const fn of ['showUpcomingAlerts','showDateDiscrepancies','showReviewQueue','showRelated'])assert.ok(js.includes("'"+fn+"'"),fn);
+for(const id of ['upcoming','date-discrepancies','review-results'])assert.ok(js.includes("'"+id+"'"),id);
+assert.match(js,/cell\.setAttribute\('data-label',headings\[i\]/);
+assert.match(css,/#tab-avisos table\.servamar-mobile-cards tbody tr/);
+assert.match(css,/#tab-avisos table\.servamar-mobile-cards tbody td::before/);
+assert.match(html,/style\.css\?v=65/);
+assert.match(html,/app\.js\?v=65/);
+console.log('V65 alert and review mobile cards checks passed');

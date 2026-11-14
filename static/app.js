@@ -210,7 +210,7 @@ async function showUpcomingAlerts(){try{
    '</tbody></table></div>':'<p>No hay recordatorios programados en ese período.</p>');
   return;
  }
- const j=await api('/api/alerts/upcoming');const root=$('upcoming');root.innerHTML='<p><b>'+j.count+'</b> avisos programados para los próximos 30 días. Esta pantalla no envía correos.</p>'+(j.items.length?'<div class="tablewrap"><table><thead><tr><th>Embarcación</th><th>Fecha de aviso</th><th>Vencimiento</th><th>Anticipación</th></tr></thead><tbody>'+j.items.map(x=>'<tr><td>'+escapeHtml(x.name)+'</td><td>'+escapeHtml(x.category==='retorno_temporal'?'Retorno temporal':'Vencimiento')+'</td><td>'+formatDate(x.notify_on)+'</td><td>'+formatDate(x.expiry_date)+'</td><td>'+x.days_before+' día(s)</td></tr>').join('')+'</tbody></table></div>':'<p>No hay avisos programados en el período.</p>')+(j.truncated?'<p>Se muestran los primeros 1,000 avisos.</p>':'')
+ const j=await api('/api/alerts/upcoming');const root=$('upcoming');root.innerHTML='<p><b>'+j.count+'</b> avisos programados para los próximos 30 días. Esta pantalla no envía correos.</p>'+(j.items.length?'<div class="tablewrap"><table><thead><tr><th>Embarcación</th><th>Tipo</th><th>Fecha de aviso</th><th>Vencimiento</th><th>Anticipación</th></tr></thead><tbody>'+j.items.map(x=>'<tr><td>'+escapeHtml(x.name)+'</td><td>'+escapeHtml(x.category==='retorno_temporal'?'Retorno temporal':'Vencimiento')+'</td><td>'+formatDate(x.notify_on)+'</td><td>'+formatDate(x.expiry_date)+'</td><td>'+x.days_before+' día(s)</td></tr>').join('')+'</tbody></table></div>':'<p>No hay avisos programados en el período.</p>')+(j.truncated?'<p>Se muestran los primeros 1,000 avisos.</p>':'')
  }catch(e){$('upcoming').textContent=e.message}}
 async function showAlertConfig(){try{const j=await api('/api/alerts/config');$('upcoming').textContent='Correo SMTP: '+(j.smtp_ready?'configurado':'sin configurar')+' · Destinatario administrativo: '+(j.admin_recipient?'configurado':'pendiente')+' · Envíos a clientes: '+(j.client_enabled?'habilitables':'desactivados')+' · Autorización de envío: '+(j.send_confirmed?'activada':'desactivada')+' · Android: pendiente hasta la fase final de nube.'}catch(e){$('upcoming').textContent=e.message}}
 
@@ -449,3 +449,32 @@ async function enableBrowserAlarms(){
 }
 window.addEventListener('load',()=>{refreshMobileAlarms();window.setInterval(()=>refreshMobileAlarms(),60000);});
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')refreshMobileAlarms();});
+
+
+/* V65: make dynamically rendered alert/review tables readable as Android cards. */
+function decorateDynamicMobileTables(containerId){
+ const root=$(containerId);if(!root)return;
+ for(const table of root.querySelectorAll('table')){
+  const headings=Array.from(table.querySelectorAll('thead th')).map(th=>th.textContent.trim());
+  if(!headings.length)continue;
+  table.classList.add('servamar-mobile-cards');
+  for(const row of table.querySelectorAll('tbody tr')){
+   const cells=Array.from(row.cells);
+   if(cells.length!==headings.length)continue;
+   cells.forEach((cell,i)=>cell.setAttribute('data-label',headings[i]||'Detalle'));
+  }
+ }
+}
+for(const [name,container] of [
+ ['showUpcomingAlerts','upcoming'],
+ ['showDateDiscrepancies','date-discrepancies'],
+ ['showReviewQueue','review-results'],
+ ['showRelated','review-results']
+]){
+ const original=globalThis[name];
+ if(typeof original==='function')globalThis[name]=async function(...args){
+  const result=await original.apply(this,args);
+  decorateDynamicMobileTables(container);
+  return result;
+ };
+}
