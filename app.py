@@ -1415,6 +1415,9 @@ def expirations():
  mode=request.args.get('mode','upcoming')
  if mode not in ('upcoming','overdue','review','departures'):return jsonify(error='Filtro no válido'),400
  items=current_deadlines()
+ if DEMO_MODE:
+  from demo_vessels import demo_operational_rows
+  items.extend(demo_operational_rows())
  if mode=='upcoming':items=[x for x in items if not x.get('closure_due_to_90_days') and 0<=x['operational_remaining_days']<=30]
  elif mode=='overdue':items=[x for x in items if not x.get('closure_due_to_90_days') and x['operational_remaining_days']<0]
  elif mode=='departures':items=[x for x in items if x['temporarily_away']]
@@ -1773,7 +1776,14 @@ def alerts_preview():
 def dashboard():
  dates=current_deadlines()
  with conn() as c:total=c.execute('SELECT COUNT(*) FROM vessels').fetchone()[0]
- return jsonify({'total':total,'review':total-sum(v['date_quality']=='confirmado' for v in dates),
+ demo_total=0
+ if DEMO_MODE:
+  from demo_vessels import demo_operational_rows,dbconnect
+  dates.extend(demo_operational_rows())
+  with dbconnect() as db:
+   demo_total=db.execute('SELECT COUNT(*) FROM servamar_demo_vessels').fetchone()[0]
+ return jsonify({'total':total+demo_total,'demo_pg_count':demo_total,
+   'review':total-sum(v['date_quality']=='confirmado' for v in dates if not v.get('demo_pg')),
    'active':sum(v['remaining_days']>=0 and v['date_quality']=='confirmado' for v in dates),
    'soon':sum(not v.get('closure_due_to_90_days') and 0<=v['operational_remaining_days']<=30 for v in dates),
    'expired':sum(not v.get('closure_due_to_90_days') and v['operational_remaining_days']<0 for v in dates),
@@ -1908,6 +1918,9 @@ def planned_alerts_for_day(today=None):
                  'vessel':r['name'],'category':'retorno_temporal',
                  'expiry_date':r['expiry_date'],'days_before':r['days_before'],
                  'recipients':['administracion'] if os.getenv('ADMIN_EMAIL','').strip() else []})
+ if DEMO_MODE:
+  from demo_vessels import demo_reminders_for_day
+  items.extend(demo_reminders_for_day(today))
  return {'date':today.isoformat(),'count':len(items),'configuration':mail_eligibility(),'items':items}
 
 def send_admin_test():
