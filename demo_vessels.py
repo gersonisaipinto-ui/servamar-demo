@@ -308,7 +308,7 @@ def demo_movement_history(vessel_id):
 @bp.route("/api/demo/vessels/<int:vessel_id>/movements/<int:movement_id>", methods=["PATCH", "DELETE"])
 def correct_demo_movement(vessel_id, movement_id):
     """Transactional correction; reject legacy histories that cannot be replayed safely."""
-    from demo_movement_replay import replay_movements
+    from demo_movement_correction import plan_movement_correction
     payload = request.get_json(silent=True)
     if not isinstance(payload, dict):
         return jsonify(error="Se requiere JSON con la versión del expediente"), 400
@@ -336,26 +336,17 @@ def correct_demo_movement(vessel_id, movement_id):
             (vessel_id,)).fetchall()
         if not any(row[0] == movement_id for row in raw):
             return jsonify(error="Movimiento no encontrado"), 404
-        # Legacy records could have been created directly in a non-entry stage or
-        # edited manually; never silently overwrite a state that disagrees with replay.
-        original = [{"kind": row[1], "event_date": row[2]} for row in raw]
+        # No writes occur until the complete chronology and stored snapshots pass.
         try:
-            before = replay_movements(entry, original)
-        except (ValueError, KeyError):
-            return jsonify(error="Historial anterior incompatible: requiere revisión manual"), 409
-        if (before["stage"], before["due_date"], before["movement_date"]) != (stage, due, last_date):
-            return jsonify(error="El estado almacenado no coincide con el historial; corrección bloqueada"), 409
-        modified = []
-        for row in raw:
-            if row[0] == movement_id:
-                if request.method == "PATCH":
-                    modified.append({"kind": kind, "event_date": event_date})
-            else:
-                modified.append({"kind": row[1], "event_date": row[2]})
-        try:
-            after = replay_movements(entry, modified)
-        except (ValueError, KeyError) as exc:
-            return jsonify(error="Corrección incompatible con movimientos posteriores: " + str(exc)), 400
+            plan = plan_movement_correction(
+                entry, raw, movement_id,
+                "edit" if request.method == "PATCH" else "delete",
+                kind if request.method == "PATCH" else None,
+                event_date if request.method == "PATCH" else None,
+                (stage, due, last_date))
+        except (ValueError, KeyError, TypeError) as exc:
+            return jsonify(error="Corrección bloqueada: " + str(exc)), 409
+        after = plan["after"]
         # Preserve existing IDs and recalculate all surviving downstream snapshots.
         db.execute("""CREATE TABLE IF NOT EXISTS servamar_demo_movement_corrections (
             id BIGSERIAL PRIMARY KEY, vessel_id BIGINT NOT NULL,
@@ -366,11 +357,7 @@ def correct_demo_movement(vessel_id, movement_id):
         def snapshot(items):
             return json.dumps([{"id": item[0], "kind": item[1],
                 "event_date": item[2].isoformat()} for item in items])
-        new_rows = [(row[0], item["kind"], item["event_date"])
-                    for row in raw if row[0] != movement_id or request.method == "PATCH"
-                    for item in [({"kind": kind, "event_date": event_date}
-                                 if row[0] == movement_id else
-                                 {"kind": row[1], "event_date": row[2]})]]
+        new_rows = plan["rows"]
         if request.method == "DELETE":
             db.execute("DELETE FROM servamar_demo_movements WHERE id=%s AND vessel_id=%s",
                        (movement_id, vessel_id))
