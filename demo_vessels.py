@@ -55,6 +55,11 @@ def init_demo_vessels(app):
             stage_after TEXT NOT NULL,
             due_after DATE,
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())""")
+        db.execute("""CREATE TABLE IF NOT EXISTS servamar_demo_movement_corrections (
+            id BIGSERIAL PRIMARY KEY, vessel_id BIGINT NOT NULL,
+            movement_id BIGINT NOT NULL, action TEXT NOT NULL,
+            registration TEXT NOT NULL, before_state JSONB NOT NULL,
+            after_state JSONB NOT NULL, at_time TIMESTAMPTZ NOT NULL DEFAULT NOW())""")
     app.register_blueprint(bp)
 
 
@@ -348,11 +353,6 @@ def correct_demo_movement(vessel_id, movement_id):
             return jsonify(error="Corrección bloqueada: " + str(exc)), 409
         after = plan["after"]
         # Preserve existing IDs and recalculate all surviving downstream snapshots.
-        db.execute("""CREATE TABLE IF NOT EXISTS servamar_demo_movement_corrections (
-            id BIGSERIAL PRIMARY KEY, vessel_id BIGINT NOT NULL,
-            movement_id BIGINT NOT NULL, action TEXT NOT NULL,
-            registration TEXT NOT NULL, before_state JSONB NOT NULL,
-            after_state JSONB NOT NULL, at_time TIMESTAMPTZ NOT NULL DEFAULT NOW())""")
         import json
         def snapshot(items):
             return json.dumps([{"id": item[0], "kind": item[1],
