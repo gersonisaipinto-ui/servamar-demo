@@ -1,0 +1,16 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const js = fs.readFileSync('static/demo-vessels.js','utf8');
+const css = fs.readFileSync('static/style.css','utf8');
+const html = fs.readFileSync('templates/index.html','utf8');
+assert.match(js, /select\.value=m\.kind/,'Correction selector must preselect existing movement');
+assert.match(js, /dateInput\.value=fmt\(m\.event_date\)/,'Correction date must be prefilled');
+assert.match(js, /form\.onsubmit=async event/,'Correction must use inline form');
+assert.match(js, /kind:select\.value,event_date:iso\(dateInput\.value\)/,'Save must use selected type and date');
+assert.doesNotMatch(js, /prompt\('Tipo de movimiento/,'No manual movement prompt');
+assert.match(js, /Cumple 90 días fuera/,'Temporary departure must have explicit 90-day label');
+assert.match(js, /td\.dataset\.label/,'Responsive table must expose field labels');
+assert.match(css, /\.dbdemo-vessels-table tbody\{display:grid/,'Mobile vessel cards');
+assert.match(html, /demo-vessels\.js\?v=63/,'JS cache version');
+assert.match(html, /style\.css\?v=63/,'CSS cache version');
+console.log('V63 UI regression checks passed');
