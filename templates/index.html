@@ -75,7 +75,18 @@
 <div class="actions"><button class="secondary" onclick="showReviewQueue()">Ver expedientes con datos incompletos</button><button class="secondary" onclick="showRelated()">Posibles permisos relacionados</button></div>
 <div id="review-results" aria-live="polite"></div></details></section></section>
 <section id="tab-exportar" class="tab-panel" hidden><section class="panel"><h2>Descargar control</h2><p class="muted">Exporta las embarcaciones por período, utilizando la fecha de ingreso o el vencimiento. Se incluirán las fechas vigentes o las referencias históricas, claramente identificadas.</p>
-<div class="grid"><label class="field">Fecha para filtrar<select id="report-field"><option value="vencimiento">Fecha de vencimiento</option><option value="ingreso">Fecha de ingreso</option></select></label><label class="field">Período<select id="report-period" onchange="toggleReportDates()"><option value="all">Todo el historial</option><option value="month">Mes actual</option><option value="year">Año actual</option><option value="previous_year">Año anterior</option><option value="next30">Próximos 30 días</option><option value="last30">Últimos 30 días</option><option value="custom">Personalizado</option></select></label><label class="field report-custom" hidden>Desde (dd/mm/yyyy)<input autocomplete="off" id="report-from" placeholder="dd/mm/yyyy" maxlength="10"></label><label class="field report-custom" hidden>Hasta (dd/mm/yyyy)<input autocomplete="off" id="report-to" placeholder="dd/mm/yyyy" maxlength="10"></label></div><div class="actions"><button onclick="downloadControl('xlsx')">Descargar Excel</button><button class="secondary" onclick="downloadControl('pdf')">Descargar PDF</button></div><p id="report-status" class="muted"></p></section></section>
+<div class="grid"><label class="field">Fecha para filtrar<select id="report-field"><option value="vencimiento">Fecha de vencimiento</option><option value="ingreso">Fecha de ingreso</option></select></label><label class="field">Período<select id="report-period" onchange="toggleReportDates()"><option value="all">Todo el historial</option><option value="month">Mes actual</option><option value="year">Año actual</option><option value="previous_year">Año anterior</option><option value="next30">Próximos 30 días</option><option value="last30">Últimos 30 días</option><option value="custom">Personalizado</option></select></label><label class="field report-custom" hidden>Desde (dd/mm/yyyy)<input autocomplete="off" id="report-from" placeholder="dd/mm/yyyy" maxlength="10"></label><label class="field report-custom" hidden>Hasta (dd/mm/yyyy)<input autocomplete="off" id="report-to" placeholder="dd/mm/yyyy" maxlength="10"></label></div><div class="actions"><button onclick="downloadControl('xlsx')">Descargar Excel</button><button class="secondary" onclick="downloadControl('pdf')">Descargar PDF</button></div><p id="report-status" class="muted"></p>
+{% if demo_mode %}
+<div style="border-top:1px solid #d5dfeb;margin-top:18px;padding-top:14px">
+<h3>Reportes de PostgreSQL DEMO</h3>
+<p class="muted">Estos archivos contienen solamente las embarcaciones ficticias persistentes y respetan el período y el filtro de fecha seleccionados arriba. Los reportes anteriores corresponden a los ejemplos de la base temporal y no incluyen PostgreSQL.</p>
+<div class="actions">
+<button type="button" onclick="servamarDemoDownload('xlsx')">Descargar Excel PostgreSQL DEMO</button>
+<button type="button" class="secondary" onclick="servamarDemoDownload('pdf')">Descargar PDF PostgreSQL DEMO</button>
+</div>
+<p id="dbdemo-export-status" class="muted" aria-live="polite"></p>
+</div>
+{% endif %}</section></section>
 <section id="tab-excel" class="tab-panel" hidden>
 <section class="panel"><h2>Actualizar desde Excel</h2><p class="muted">Compatible con el control original, el archivo de depósito y la base consolidada. La importación preserva cambios locales, crea un respaldo y no valida fechas automáticamente.</p>
 <div class="actions"><input type="file" id="importfile" accept=".xlsx"><button class="secondary" onclick="previewImport()">Verificar archivo</button><button id="importcommit" disabled onclick="commitImport()">Importar cambios</button></div><pre id="importstatus" class="muted"></pre></section></section>
@@ -128,7 +139,14 @@
 <p class="muted">La fecha de vencimiento se recalcula según el tipo de movimiento. Una salida temporal impide depósito o ampliación hasta registrar retorno. Este laboratorio es una simulación, no una autorización oficial.</p>
 </div>
 <div id="dbdemo-audit" class="muted" aria-live="polite"></div>
+<section style="border-top:1px solid #d5dfeb;margin-top:18px;padding-top:14px">
+<h3>Respaldo de PostgreSQL DEMO</h3>
+<p class="muted">Descarga un ZIP con embarcaciones ficticias, movimientos y auditoría, más un manifiesto SHA-256. No incluye datos de clientes ni suscripciones push. La restauración automática aún no está habilitada. Guarda la copia antes del 13/12/2026.</p>
+<div class="actions"><a class="button secondary" href="/api/demo/backup" download>Descargar respaldo ZIP de prueba</a>
+<button class="secondary" type="button" onclick="servamarDemoBackupStatus()">Comprobar contenido del respaldo</button></div>
+<p id="dbdemo-backup-status" class="muted" aria-live="polite"></p>
+</section>
 </section></section>
 {% endif %}
 <section id="detail" class="panel detail-panel" hidden></section>
-</main><footer>Fechas en dd/mm/yyyy · Los avisos a clientes requieren correo válido, consentimiento y confirmación del envío.</footer><script src="/static/app.js?v=62"></script><script src="/static/date-inputs.js?v=58" defer></script><script src="/static/push-demo.js?v=66" defer></script>{% if demo_mode %}<script src="/static/demo-vessels.js?v=3" defer></script>{% endif %}</body></html>
+</main><footer>Fechas en dd/mm/yyyy · Los avisos a clientes requieren correo válido, consentimiento y confirmación del envío.</footer><script src="/static/app.js?v=62"></script><script src="/static/date-inputs.js?v=58" defer></script><script src="/static/push-demo.js?v=66" defer></script>{% if demo_mode %}<script src="/static/demo-vessels.js?v=4" defer></script>{% endif %}</body></html>
