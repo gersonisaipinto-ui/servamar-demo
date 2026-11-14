@@ -180,3 +180,22 @@ button:disabled{opacity:.5;cursor:not-allowed}
  #dbdemo-list .dbdemo-vessels-table td:last-child button{margin:0!important}
  .dbdemo-correction-actions button{flex:1 1 140px}
 }
+
+/* V64: responsive card presentation for Home and Search, preserving desktop tables. */
+@media(max-width:650px){
+ #tab-inicio .tablewrap,#tab-buscar .tablewrap{max-height:none;overflow:visible;min-width:0}
+ #tab-inicio table.servamar-mobile-cards,#tab-buscar table.servamar-mobile-cards{display:block;width:100%;min-width:0;border:0}
+ #tab-inicio table.servamar-mobile-cards thead,#tab-buscar table.servamar-mobile-cards thead{display:none}
+ #tab-inicio table.servamar-mobile-cards tbody,#tab-buscar table.servamar-mobile-cards tbody{display:grid;gap:12px;min-width:0}
+ #tab-inicio table.servamar-mobile-cards tbody tr,#tab-buscar table.servamar-mobile-cards tbody tr{display:grid;gap:8px;min-width:0;padding:14px;border:1px solid #d5e3ec;border-radius:12px;background:white;box-shadow:0 2px 7px #1020300a}
+ #tab-inicio table.servamar-mobile-cards tbody td,#tab-buscar table.servamar-mobile-cards tbody td{display:grid;grid-template-columns:minmax(96px,38%) minmax(0,1fr);align-items:start;gap:9px;min-width:0;padding:2px 0;border:0;font-size:14px;overflow-wrap:anywhere;white-space:normal}
+ #tab-inicio table.servamar-mobile-cards tbody td::before,#tab-buscar table.servamar-mobile-cards tbody td::before{content:attr(data-label);font-weight:700;color:#536e80}
+ #tab-inicio table.servamar-mobile-cards tbody td:last-child:not([colspan]),#tab-buscar table.servamar-mobile-cards tbody td:last-child:not([colspan]){display:flex;flex-wrap:wrap}
+ #tab-inicio table.servamar-mobile-cards tbody td:last-child:not([colspan])::before,#tab-buscar table.servamar-mobile-cards tbody td:last-child:not([colspan])::before{display:none}
+ #tab-inicio table.servamar-mobile-cards tbody td[colspan],#tab-buscar table.servamar-mobile-cards tbody td[colspan]{display:block;grid-column:1/-1;line-height:1.5}
+ #tab-inicio table.servamar-mobile-cards tbody td[colspan]::before,#tab-buscar table.servamar-mobile-cards tbody td[colspan]::before{display:none}
+ #tab-inicio table.servamar-mobile-cards button,#tab-buscar table.servamar-mobile-cards button{width:100%;min-height:44px}
+ #tab-inicio .panel,#tab-buscar .panel{min-width:0}
+ #tab-inicio .toolbar .actions{display:flex;flex-wrap:wrap}
+ #tab-inicio .toolbar select{max-width:100%;width:100%}
+}

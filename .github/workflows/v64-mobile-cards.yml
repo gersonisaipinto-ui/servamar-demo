@@ -1,0 +1,17 @@
+name: SERVAMAR V64 mobile cards
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  mobile-ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check static/app.js
+      - run: node --check static/demo-vessels.js
+      - run: node tests/v63-ui-validation.cjs
+      - run: node tests/v64-mobile-cards.cjs
