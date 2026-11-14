@@ -362,6 +362,56 @@ def delivery_history(limit=20):
              "accepted_by_provider":r[3],"registered_at":r[4]} for r in rows]
 
 
+
+@bp.post("/api/push/demo-reminder-test")
+def demo_reminder_test():
+    """Explicit operator-triggered simulated reminder for a PostgreSQL DEMO vessel.
+
+    Uses actual reminder calculation at the selected *future date* but sends
+    immediately. Never changes the official daily check history or sends email.
+    Each vessel/date/threshold is delivered at most once per subscribed device.
+    """
+    from datetime import date, timedelta
+    from app import DEMO_MODE, CLOUD_MODE, planned_alerts_for_day
+    if not (DEMO_MODE and CLOUD_MODE and PG_URL):
+        return jsonify(error="Simulación disponible solo en la nube DEMO con PostgreSQL"),403
+    data=request.get_json(silent=True)
+    if not isinstance(data,dict) or data.get("confirmation")!="SIMULAR":
+        return jsonify(error="Confirma explícitamente la simulación"),400
+    try:
+        reg=str(data.get("registration") or "").strip().upper()
+        notify=date.fromisoformat(str(data.get("notify_on") or ""))
+        today=datetime.now(ZoneInfo("America/Guatemala")).date()
+        if not reg.startswith("DEMO-") or len(reg)>29:
+            raise ValueError("Solo registros ficticios DEMO-")
+        if notify<today or notify>today+timedelta(days=60):
+            raise ValueError("Fecha del aviso fuera de los próximos 60 días")
+    except (TypeError,ValueError) as exc:
+        return jsonify(error=str(exc) or "Fecha inválida"),400
+    candidates=[
+        row for row in planned_alerts_for_day(notify)["items"]
+        if row.get("demo_pg") and row.get("declaration")==reg
+    ]
+    if not candidates:
+        return jsonify(error="El expediente ficticio no tiene un recordatorio en esa fecha; actualiza la agenda"),409
+    # The same registration can have multiple milestones at one time. Tie the
+    # idempotency key to the stored vessel, deadline and reminder threshold.
+    keys_set=sorted({(str(x["vessel_id"]),str(x["expiry_date"]),int(x["days_before"])) for x in candidates})
+    key_material=json.dumps([notify.isoformat(),reg,keys_set],sort_keys=True).encode()
+    key="simulation-"+hashlib.sha256(key_material).hexdigest()[:40]
+    result=send_demo({
+        "title":"SERVAMAR - Simulación de vencimiento",
+        "body":"Aviso automático ficticio: se verificó una regla de vencimiento. No requiere acción."
+    },day=key)
+    success=result["subscribers"]>0 and result["failed"]==0
+    return jsonify(ok=success,simulated_date=notify.isoformat(),
+                   matched_alerts=len(candidates),registration=reg,
+                   accepted=result["accepted"],skipped=result["skipped"],
+                   failed=result["failed"],subscribers=result["subscribers"],
+                   repeated=(result["accepted"]==0 and result["skipped"]>0),
+                   note="Enviado ahora como prueba; no se modificó la revisión diaria ni se enviaron correos."), (200 if success else 503)
+
+
 @bp.get("/api/push/status")
 def push_status():
     """Diagnóstico protegido por HTTP Basic (comprobado en app.before_request)."""
