@@ -1,0 +1,35 @@
+name: SERVAMAR V67 Neon migration integration
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  migration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: ci-password
+          POSTGRES_USER: postgres
+          POSTGRES_DB: source_demo
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d source_demo"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install test requirements
+        run: pip install "psycopg[binary]>=3.3,<4" "Flask>=3,<4"
+      - name: Syntax validation
+        run: python -m py_compile app.py neon_migration.py tests/test_v67_neon_migration.py
+      - name: Transactional migration integration
+        env:
+          V67_TEST_POSTGRES_URL: postgresql://postgres:ci-password@127.0.0.1:5432/source_demo
+        run: python -m unittest discover -s tests -p 'test_v67_*.py' -v
