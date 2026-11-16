@@ -14,6 +14,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - run: pip install 'Flask>=3,<4'
       - run: python -m py_compile app.py demo_vessels.py demo_movement_correction.py
       - run: node --check static/demo-vessels.js
       - run: python -m unittest discover -s tests -p 'test_v69_*.py' -v
