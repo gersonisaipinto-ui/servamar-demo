@@ -22,6 +22,7 @@
  };
  const setRecord=r=>{
   editing=r||null;
+  const editor=$('dbdemo-editor-fold');if(editor&&r)editor.open=true;
   $('dbdemo-title').textContent=r?'Modificar registro ficticio':'Nuevo registro ficticio';
   $('dbdemo-save').textContent=r?'Guardar modificaciones':'Guardar nuevo registro';
   for(const k of fields){const v=r?r[k]:(k==='stage'?'ingreso':'');$('dbdemo-'+k).value=(k==='entry_date'||k==='movement_date')?fmt(v).replace('—',''):(v||'');}
@@ -49,7 +50,7 @@
       const td=document.createElement('td');td.dataset.label=['Registro','Embarcación','Capitán','Etapa',dueLabel(r)][index];td.textContent=val;row.append(td);
     }
     const actions=document.createElement('td');actions.dataset.label='Acciones';
-    const edit=document.createElement('button');edit.type='button';edit.className='secondary';edit.textContent='Editar';edit.onclick=()=>{setRecord(r);$('dbdemo-form').scrollIntoView({behavior:'smooth'});};
+    const edit=document.createElement('button');edit.type='button';edit.className='secondary';edit.textContent='Editar';edit.onclick=()=>{setRecord(r);$('dbdemo-editor-fold').scrollIntoView({behavior:'smooth',block:'start'});};
     const del=document.createElement('button');del.type='button';del.className='secondary';del.textContent='Archivar expediente';del.style.marginLeft='6px';
     del.onclick=async()=>{
       const confirmation=prompt('ATENCIÓN: vas a ocultar el expediente COMPLETO de '+r.vessel_name+'.\nPara quitar solo la ampliación, entra en Editar > Historial de movimientos > Eliminar movimiento.\n\nPara archivar TODO el expediente, escribe exactamente: ARCHIVAR '+r.registration);
