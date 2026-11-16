@@ -8,6 +8,6 @@ for(const selector of ['#tab-nuevo .actions','#tab-buscar .actions','#tab-export
 assert.match(css,/@media\(max-width:650px\)/);
 assert.match(css, /min-height:46px/);
 assert.match(css, /grid-template-columns:minmax\(0,1fr\)/);
-assert.match(html,/style\.css\?v=(?:66|70)/);
-assert.match(app,/VERSION='(?:6[6-9]|70)'/);
+assert.match(html,/style\.css\?v=(?:66|70|71)/);
+assert.match(app,/VERSION='(?:6[6-9]|7[01])'/);
 console.log('V66 mobile forms and details checks passed');
