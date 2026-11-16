@@ -1,0 +1,10 @@
+const assert=require('node:assert/strict'),fs=require('node:fs');
+const py=fs.readFileSync('demo_vessels.py','utf8');
+const js=fs.readFileSync('static/demo-vessels.js','utf8');
+assert.match(py,/payload\.get\("confirm_archive"\) != "ARCHIVAR " \+ locked\[0\]/);
+assert.match(py,/WHERE deleted_at IS NULL\s+ORDER BY due_date NULLS LAST,id/);
+assert.match(js,/del\.textContent='Archivar expediente'/);
+assert.match(js,/confirm_archive:confirmation/);
+assert.match(js,/La embarcación y su ingreso inicial se CONSERVARÁN/);
+assert.match(js,/\/movements\/'\+m\.id,'DELETE'/);
+console.log('V69 separate archival and movement deletion passed');
