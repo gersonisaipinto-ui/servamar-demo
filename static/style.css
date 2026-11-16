@@ -267,3 +267,44 @@ button:disabled{opacity:.5;cursor:not-allowed}
  #tab-avisos .detail-fold summary{line-height:1.45;overflow-wrap:anywhere}
  #tab-excel pre{max-width:100%;white-space:pre-wrap;overflow-wrap:anywhere}
 }
+
+
+/* V70: quiet, task-first PostgreSQL demo workspace */
+.dbdemo-workspace{padding:clamp(14px,2.3vw,26px);background:#fff}
+.dbdemo-heading,.dbdemo-section-heading{display:flex;align-items:center;justify-content:space-between;gap:14px}
+.dbdemo-heading{padding-bottom:16px;border-bottom:1px solid #e8eef2}
+.dbdemo-heading h2{margin:0;font-size:21px;letter-spacing:-.025em}
+.dbdemo-heading p{margin:6px 0 0;max-width:670px;font-size:13px;line-height:1.5}
+.dbdemo-mode{white-space:nowrap;background:#edf5f5;color:#23636a;border-radius:999px;padding:6px 11px;font-size:11px;font-weight:700}
+.dbdemo-notice{margin:13px 0 20px;border:1px solid #e8e6d9;border-radius:10px;background:#fbfaf6;padding:9px 13px;font-size:12px;color:#6d634b}
+.dbdemo-notice summary{cursor:pointer;font-weight:600}
+.dbdemo-notice p{margin:10px 0 3px;line-height:1.6}
+.dbdemo-section-heading{margin:0 0 9px}
+.dbdemo-section-heading h3{font-size:16px;margin:0}
+.dbdemo-list-section{margin-bottom:18px}
+.dbdemo-list-section .tablewrap{max-height:none;overflow-x:auto}
+.dbdemo-workspace .dbdemo-vessels-table{width:100%;border-collapse:collapse}
+.dbdemo-workspace .dbdemo-vessels-table th{font-size:11px;text-transform:uppercase;letter-spacing:.035em;color:#6b7c87}
+.dbdemo-workspace .dbdemo-vessels-table tbody tr:hover{background:#f8fbfc}
+.dbdemo-workspace .dbdemo-vessels-table td{line-height:1.5}
+.dbdemo-editor-fold,.dbdemo-tools-fold{border:1px solid #e1e9ee;border-radius:12px;margin-top:12px;background:#fff}
+.dbdemo-editor-fold>summary,.dbdemo-tools-fold>summary{cursor:pointer;padding:15px 17px;font-weight:700;color:#24485c;list-style-position:inside}
+.dbdemo-editor-fold[open]>summary,.dbdemo-tools-fold[open]>summary{border-bottom:1px solid #e8eef2;background:#f9fbfc}
+.dbdemo-summary-hint{font-size:12px;font-weight:400;color:#7a8994;margin-left:9px}
+.dbdemo-editor-content,.dbdemo-tools-content{padding:18px}
+.dbdemo-editor-content #dbdemo-form h3{margin-top:0;font-size:17px}
+.dbdemo-editor-content #dbdemo-movement-panel{margin:18px 0 0;box-shadow:none;background:#f9fbfc}
+.dbdemo-editor-content #dbdemo-movement-panel h3{margin-top:0}
+.dbdemo-workspace .actions{gap:8px}
+.dbdemo-workspace button.secondary{background:#f0f4f7;color:#31596b}
+.dbdemo-workspace button{transition:background .15s ease}
+.dbdemo-workspace #dbdemo-audit:empty{display:none}
+@media(max-width:650px){
+ .dbdemo-heading{align-items:flex-start}
+ .dbdemo-heading h2{font-size:19px}
+ .dbdemo-mode{font-size:10px}
+ .dbdemo-summary-hint{display:block;margin:4px 0 0 20px}
+ .dbdemo-editor-content,.dbdemo-tools-content{padding:13px}
+ .dbdemo-editor-fold>summary,.dbdemo-tools-fold>summary{padding:13px}
+ .dbdemo-workspace .dbdemo-vessels-table td{padding:8px 10px}
+}
