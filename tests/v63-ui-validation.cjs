@@ -11,6 +11,6 @@ assert.doesNotMatch(js, /prompt\('Tipo de movimiento/,'No manual movement prompt
 assert.match(js, /Cumple 90 días fuera/,'Temporary departure must have explicit 90-day label');
 assert.match(js, /td\.dataset\.label/,'Responsive table must expose field labels');
 assert.match(css, /\.dbdemo-vessels-table tbody\{display:grid/,'Mobile vessel cards');
-assert.match(html, /demo-vessels\.js\?v=(?:63|68|69)/,'JS cache version');
+assert.match(html, /demo-vessels\.js\?v=(?:63|68|69|70)/,'JS cache version');
 assert.match(html, /style\.css\?v=66/,'CSS cache version');
 console.log('V63 UI regression checks passed');
