@@ -39,6 +39,7 @@ def init_demo_vessels(app):
             version INTEGER NOT NULL DEFAULT 1,
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())""")
+        db.execute("ALTER TABLE servamar_demo_vessels ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ")
         db.execute("""CREATE TABLE IF NOT EXISTS servamar_demo_vessel_audit (
             id BIGSERIAL PRIMARY KEY,
             vessel_id BIGINT NOT NULL,
@@ -125,7 +126,7 @@ SELECT = """SELECT id,registration,vessel_name,captain,stage,entry_date,
 def vessels():
     if request.method == "GET":
         with dbconnect() as db:
-            rows = db.execute(SELECT + " ORDER BY due_date NULLS LAST, id DESC LIMIT 200").fetchall()
+            rows = db.execute(SELECT + " WHERE deleted_at IS NULL ORDER BY due_date NULLS LAST, id DESC LIMIT 200").fetchall()
         return jsonify(ok=True, editable=True, persistent=True,
                        note="Laboratorio separado; no aparece en los expedientes de producción.",
                        items=[record(x) for x in rows])
@@ -166,7 +167,7 @@ def vessel_edit(vessel_id):
         try:
             with dbconnect() as db:
                 current=db.execute("""SELECT stage FROM servamar_demo_vessels
-                    WHERE id=%s AND version=%s FOR UPDATE""",(vessel_id,expected)).fetchone()
+                    WHERE id=%s AND version=%s AND deleted_at IS NULL FOR UPDATE""",(vessel_id,expected)).fetchone()
                 if not current:
                     return jsonify(error="El registro cambió o fue eliminado; actualiza la lista"),409
                 if data[3] != current[0]:
@@ -184,7 +185,7 @@ def vessel_edit(vessel_id):
                 row = db.execute("""UPDATE servamar_demo_vessels SET
                     registration=%s,vessel_name=%s,captain=%s,stage=%s,entry_date=%s,
                     movement_date=%s,due_date=%s,notes=%s,version=version+1,updated_at=NOW()
-                    WHERE id=%s AND version=%s RETURNING id""",(*data,vessel_id,expected)).fetchone()
+                    WHERE id=%s AND version=%s AND deleted_at IS NULL RETURNING id""",(*data,vessel_id,expected)).fetchone()
                 if not row:
                     return jsonify(error="El registro cambió o fue eliminado; actualiza la lista"),409
                 db.execute("""INSERT INTO servamar_demo_vessel_audit(vessel_id,action,registration)
@@ -193,12 +194,45 @@ def vessel_edit(vessel_id):
             return jsonify(error="Ya existe ese número de registro de prueba"),409
         return jsonify(ok=True)
     with dbconnect() as db:
-        existing = db.execute("""DELETE FROM servamar_demo_vessels WHERE id=%s AND version=%s
+        existing = db.execute("""UPDATE servamar_demo_vessels SET deleted_at=NOW(),
+            version=version+1,updated_at=NOW()
+            WHERE id=%s AND version=%s AND deleted_at IS NULL
             RETURNING registration""",(vessel_id,expected)).fetchone()
         if not existing:
             return jsonify(error="El registro cambió o fue eliminado; actualiza la lista"),409
         db.execute("""INSERT INTO servamar_demo_vessel_audit(vessel_id,action,registration)
             VALUES(%s,'delete',%s)""",(vessel_id,existing[0]))
+    return jsonify(ok=True)
+
+
+@bp.get("/api/demo/vessels/deleted")
+def deleted_vessels():
+    """Recoverable DEMO records only; original movements remain linked."""
+    with dbconnect() as db:
+        rows=db.execute(SELECT + """ WHERE deleted_at IS NOT NULL
+            ORDER BY deleted_at DESC LIMIT 100""").fetchall()
+    return jsonify(ok=True,items=[record(row) for row in rows])
+
+
+@bp.post("/api/demo/vessels/<int:vessel_id>/restore")
+def restore_vessel(vessel_id):
+    """Undo a soft deletion without replacing the current database."""
+    payload=request.get_json(silent=True)
+    if not isinstance(payload,dict):
+        return jsonify(error="Solicitud JSON inválida"),400
+    try:
+        expected=int(payload.get("version"))
+    except (ValueError,TypeError):
+        return jsonify(error="Se requiere versión para restaurar"),400
+    with dbconnect() as db:
+        row=db.execute("""UPDATE servamar_demo_vessels
+            SET deleted_at=NULL,version=version+1,updated_at=NOW()
+            WHERE id=%s AND version=%s AND deleted_at IS NOT NULL
+            RETURNING registration""",(vessel_id,expected)).fetchone()
+        if not row:
+            return jsonify(error="Registro ya restaurado o versión modificada"),409
+        db.execute("""INSERT INTO servamar_demo_vessel_audit(vessel_id,action,registration)
+            VALUES(%s,'restore',%s)""",(vessel_id,row[0]))
     return jsonify(ok=True)
 
 
