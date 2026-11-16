@@ -1,0 +1,13 @@
+const assert=require('node:assert/strict'),fs=require('node:fs');
+const py=fs.readFileSync('demo_vessels.py','utf8');
+const js=fs.readFileSync('static/demo-vessels.js','utf8');
+assert.match(py,/ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ/);
+assert.match(py,/UPDATE servamar_demo_vessels SET deleted_at=NOW\(\)/);
+assert.doesNotMatch(py,/DELETE FROM servamar_demo_vessels WHERE/);
+assert.match(py,/WHERE deleted_at IS NULL ORDER BY due_date/);
+assert.match(py,/def restore_vessel\(/);
+assert.match(py,/WHERE id=%s AND version=%s AND deleted_at IS NOT NULL/);
+assert.match(js,/Eliminados recuperables/);
+assert.match(js,/\/api\/demo\/vessels\/deleted/);
+assert.match(js,/\/restore','POST'/);
+console.log('V68 reversible vessel deletion checks passed');
