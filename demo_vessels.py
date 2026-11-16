@@ -193,7 +193,16 @@ def vessel_edit(vessel_id):
         except UniqueViolation:
             return jsonify(error="Ya existe ese número de registro de prueba"),409
         return jsonify(ok=True)
+    # Full-record archival must never be mistaken for deleting a movement.
+    # Validate the explicit confirmation against the current vessel registration.
     with dbconnect() as db:
+        locked = db.execute("""SELECT registration FROM servamar_demo_vessels
+            WHERE id=%s AND version=%s AND deleted_at IS NULL FOR UPDATE""",
+            (vessel_id,expected)).fetchone()
+        if not locked:
+            return jsonify(error="El expediente cambió; actualiza la lista"),409
+        if payload.get("confirm_archive") != "ARCHIVAR " + locked[0]:
+            return jsonify(error="Para archivar el expediente completo confirma su registro; para quitar una ampliación utiliza Eliminar movimiento"),400
         existing = db.execute("""UPDATE servamar_demo_vessels SET deleted_at=NOW(),
             version=version+1,updated_at=NOW()
             WHERE id=%s AND version=%s AND deleted_at IS NULL
@@ -426,6 +435,7 @@ def demo_operational_rows(today=None):
     with dbconnect() as db:
         rows=db.execute("""SELECT id,registration,vessel_name,captain,stage,entry_date,
             movement_date,due_date FROM servamar_demo_vessels
+            WHERE deleted_at IS NULL
             ORDER BY due_date NULLS LAST,id""").fetchall()
     summary=[]
     for id_,registration,name,captain,stage,entry,movement,deadline in rows:
