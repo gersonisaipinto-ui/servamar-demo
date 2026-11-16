@@ -1,0 +1,15 @@
+name: SERVAMAR V70 clean demo layout
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check static/demo-vessels.js
+      - run: node tests/v70-clean-layout.cjs

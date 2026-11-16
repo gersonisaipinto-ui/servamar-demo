@@ -6,6 +6,6 @@ for(const id of ['upcoming','date-discrepancies','review-results'])assert.ok(js.
 assert.match(js,/cell\.setAttribute\('data-label',headings\[i\]/);
 assert.match(css,/#tab-avisos table\.servamar-mobile-cards tbody tr/);
 assert.match(css,/#tab-avisos table\.servamar-mobile-cards tbody td::before/);
-assert.match(html,/style\.css\?v=66/);
+assert.match(html,/style\.css\?v=(?:66|70)/);
 assert.match(html,/app\.js\?v=65/);
 console.log('V65 alert and review mobile cards checks passed');
