@@ -52,6 +52,10 @@ from lan_security import lan_is_enabled, check_lan_credentials, lan_config_path
 LAN_MODE=lan_is_enabled(DATA_DIR) and not CLOUD_MODE
 DB=Path(os.environ.get('BOATS_DB',str(DATA_DIR/'embarcaciones.sqlite3')))
 app=Flask(__name__)
+# V67 migration is opt-in and runs before opening DEMO connections.
+if DEMO_MODE and os.getenv('SERVAMAR_NEON_MIGRATE_ON_BOOT','').upper()=='YES':
+ from neon_migration import migrate_on_boot
+ migrate_on_boot()
 if DEMO_MODE:
  from push_demo import init_push
  init_push(app,DATA_DIR)
@@ -65,7 +69,7 @@ def serve_push_worker():
  response.headers['Service-Worker-Allowed']='/'
  return response
 
-VERSION='66'
+VERSION='67'
 app.config["MAX_CONTENT_LENGTH"] = 12 * 1024 * 1024
 
 @app.before_request
@@ -75,6 +79,8 @@ def basic_protection():
   return jsonify(error='HTTPS obligatorio'),403
  if request.path == '/healthz' and not LAN_MODE:
   return None
+ if DEMO_MODE and os.getenv('SERVAMAR_DEMO_WRITES_FROZEN','').upper()=='YES' and request.method not in ('GET','HEAD','OPTIONS'):
+  return jsonify(error='Migración de base de datos en curso: escritura DEMO temporalmente suspendida.'),503
  if DEMO_MODE and request.method not in ('GET','HEAD','OPTIONS') and request.path not in ('/api/push/subscribe','/api/push/unsubscribe','/api/push/test','/api/push/daily-check','/api/push/demo-reminder-test') and not (request.path == '/api/demo/vessels' or request.path.startswith('/api/demo/vessels/')):
   return jsonify(error='DEMO GRATUITA: solo lectura. No se permiten modificaciones, importaciones ni envíos.'),403
  if LAN_MODE:
