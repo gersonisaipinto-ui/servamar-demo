@@ -1,0 +1,19 @@
+name: SERVAMAR V68 reversible deletion
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m py_compile app.py demo_vessels.py
+      - run: node --check static/demo-vessels.js
+      - run: node tests/v68-reversible-deletion.cjs

@@ -1,6 +1,6 @@
 (function(){
  'use strict';
- let records=[],editing=null;
+ let records=[],deletedRecords=[],editing=null;
  const $=id=>document.getElementById(id);
  const status=(t,error=false)=>{const el=$('dbdemo-status');if(el){el.textContent=t;el.style.color=error?'#9b2121':'';}};
  const fmt=d=>{const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(d||''));return m?m[3]+'/'+m[2]+'/'+m[1]:(d||'—');};
@@ -52,16 +52,35 @@
     const edit=document.createElement('button');edit.type='button';edit.className='secondary';edit.textContent='Editar';edit.onclick=()=>{setRecord(r);$('dbdemo-form').scrollIntoView({behavior:'smooth'});};
     const del=document.createElement('button');del.type='button';del.className='secondary';del.textContent='Eliminar';del.style.marginLeft='6px';
     del.onclick=async()=>{
-      if(!confirm('¿Eliminar '+r.registration+'? Esta acción solo afecta al laboratorio ficticio.'))return;
-      try{await api('/api/demo/vessels/'+r.id,'DELETE',{version:r.version});status('Eliminación registrada.');await window.servamarDemoRefresh();}catch(e){status(e.message,true);}
+      if(!confirm('¿Enviar '+r.registration+' a eliminados recuperables? No se borrarán sus movimientos.'))return;
+      try{await api('/api/demo/vessels/'+r.id,'DELETE',{version:r.version});status('Registro archivado. Puedes restaurarlo desde Eliminados.');await window.servamarDemoRefresh();}catch(e){status(e.message,true);}
     };
     actions.append(edit,del);row.append(actions);body.append(row);
   }
   table.append(body);box.append(table);
+  const fold=document.createElement('details');fold.className='detail-fold';
+  const heading=document.createElement('summary');heading.textContent='Eliminados recuperables ('+deletedRecords.length+')';fold.append(heading);
+  if(deletedRecords.length){
+   const deletedTable=document.createElement('table');deletedTable.className='dbdemo-vessels-table';
+   const tbody=document.createElement('tbody');
+   for(const item of deletedRecords){
+    const tr=document.createElement('tr');
+    const td=document.createElement('td');td.textContent=item.registration+' — '+item.vessel_name+' — '+item.captain;td.dataset.label='Embarcación';tr.append(td);
+    const action=document.createElement('td');action.dataset.label='Recuperación';
+    const btn=document.createElement('button');btn.type='button';btn.className='secondary';btn.textContent='Restaurar';
+    btn.onclick=async()=>{
+      if(!confirm('¿Restaurar '+item.vessel_name+' y sus movimientos originales?'))return;
+      try{await api('/api/demo/vessels/'+item.id+'/restore','POST',{version:item.version});status('Embarcación restaurada.');await window.servamarDemoRefresh();}catch(e){status(e.message,true);}
+    };
+    action.append(btn);tr.append(action);tbody.append(tr);
+   }
+   deletedTable.append(tbody);fold.append(deletedTable);
+  }
+  box.append(fold);
   $('dbdemo-count').textContent=records.length+' registro(s) guardados en PostgreSQL de prueba.';
  };
  window.servamarDemoRefresh=async()=>{
-  try{const d=await api('/api/demo/vessels');records=d.items;render();}catch(e){status(e.message,true);}
+  try{const d=await api('/api/demo/vessels');records=d.items;const removed=await api('/api/demo/vessels/deleted');deletedRecords=removed.items;render();}catch(e){status(e.message,true);}
  };
  window.servamarDemoReset=()=>setRecord(null);
  window.servamarDemoEditById=async(id)=>{
