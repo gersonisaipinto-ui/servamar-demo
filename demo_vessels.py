@@ -302,7 +302,7 @@ def add_demo_movement(vessel_id):
         return jsonify(error=str(e) or "Verifica la fecha y la versión"),400
     with dbconnect() as db:
         v=db.execute("""SELECT registration,stage,due_date,entry_date,movement_date,version
-            FROM servamar_demo_vessels WHERE id=%s FOR UPDATE""",(vessel_id,)).fetchone()
+            FROM servamar_demo_vessels WHERE id=%s AND deleted_at IS NULL FOR UPDATE""",(vessel_id,)).fetchone()
         if not v:return jsonify(error="Registro ficticio no encontrado"),404
         registration,stage,due,entry,last_date,version=v
         if version!=expected:return jsonify(error="Este registro fue editado. Actualiza la lista"),409
@@ -364,7 +364,7 @@ def correct_demo_movement(vessel_id, movement_id):
         return jsonify(error="Versión, tipo o fecha inválidos"), 400
     with dbconnect() as db:
         vessel = db.execute("""SELECT registration,stage,due_date,entry_date,movement_date,version
-            FROM servamar_demo_vessels WHERE id=%s FOR UPDATE""", (vessel_id,)).fetchone()
+            FROM servamar_demo_vessels WHERE id=%s AND deleted_at IS NULL FOR UPDATE""", (vessel_id,)).fetchone()
         if vessel is None:
             return jsonify(error="Expediente DEMO no encontrado"), 404
         registration, stage, due, entry, last_date, version = vessel
