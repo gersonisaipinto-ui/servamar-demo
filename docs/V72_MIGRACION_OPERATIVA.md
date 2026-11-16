@@ -63,3 +63,12 @@ debe completarse antes. Neon gratuito tiene límites de almacenamiento.
 3. Separar los documentos a almacenamiento privado durable con backups.
 4. Verificar restauración y conmutación reversible en entorno de ensayo.
 5. Habilitar datos reales únicamente tras validar seguridad y capacidad.
+
+## Límite confirmado de Neon gratuito
+
+El proyecto de pruebas ya contiene una instantánea manual de V67. Intentar
+crear una segunda instantánea devolvió `snapshots limit exceeded`. No se
+eliminó la instantánea existente. **No existe todavía un respaldo automático
+externo y verificado de Neon.** La función de restauración V72 se aplica a
+respaldos operativos ZIP, no sustituye un plan de recuperación integral de
+PostgreSQL.
