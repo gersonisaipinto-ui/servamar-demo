@@ -50,10 +50,12 @@
     }
     const actions=document.createElement('td');actions.dataset.label='Acciones';
     const edit=document.createElement('button');edit.type='button';edit.className='secondary';edit.textContent='Editar';edit.onclick=()=>{setRecord(r);$('dbdemo-form').scrollIntoView({behavior:'smooth'});};
-    const del=document.createElement('button');del.type='button';del.className='secondary';del.textContent='Eliminar';del.style.marginLeft='6px';
+    const del=document.createElement('button');del.type='button';del.className='secondary';del.textContent='Archivar expediente';del.style.marginLeft='6px';
     del.onclick=async()=>{
-      if(!confirm('¿Enviar '+r.registration+' a eliminados recuperables? No se borrarán sus movimientos.'))return;
-      try{await api('/api/demo/vessels/'+r.id,'DELETE',{version:r.version});status('Registro archivado. Puedes restaurarlo desde Eliminados.');await window.servamarDemoRefresh();}catch(e){status(e.message,true);}
+      const confirmation=prompt('ATENCIÓN: vas a ocultar el expediente COMPLETO de '+r.vessel_name+'.\nPara quitar solo la ampliación, entra en Editar > Historial de movimientos > Eliminar movimiento.\n\nPara archivar TODO el expediente, escribe exactamente: ARCHIVAR '+r.registration);
+      if(confirmation===null)return;
+      if(confirmation!=='ARCHIVAR '+r.registration){status('Archivado cancelado: confirmación incorrecta.',true);return;}
+      try{await api('/api/demo/vessels/'+r.id,'DELETE',{version:r.version,confirm_archive:confirmation});status('Expediente completo archivado. Puedes restaurarlo desde Eliminados.');await window.servamarDemoRefresh();}catch(e){status(e.message,true);}
     };
     actions.append(edit,del);row.append(actions);body.append(row);
   }
@@ -189,7 +191,7 @@
        del.type='button';del.className='secondary';del.textContent='Eliminar movimiento';
        del.style.marginLeft='6px';
        del.onclick=async()=>{
-         if(!confirm('¿Eliminar este movimiento ficticio y recalcular los posteriores? La auditoría conservará el cambio.'))return;
+         if(!confirm('¿Quitar únicamente el movimiento '+(movementNames[m.kind]||m.kind)+' de '+editing.vessel_name+'?\n\nLa embarcación y su ingreso inicial se CONSERVARÁN. El vencimiento se recalculará.'))return;
          try{
            const selectedId=editing.id;
            await api('/api/demo/vessels/'+selectedId+'/movements/'+m.id,'DELETE',{version:editing.version});
@@ -197,7 +199,7 @@
            const updated=records.find(x=>x.id===selectedId);
            if(updated)setRecord(updated);
            await window.servamarDemoMovementHistory();
-           status('Movimiento eliminado y vencimientos recalculados.');
+           status('Solo el movimiento fue eliminado. Expediente e ingreso inicial conservados.');
          }catch(e){status(e.message,true);}
        };
        const controls=document.createElement('div');controls.className='dbdemo-history-actions';controls.append(edit,del);item.append(controls);root.append(item);
