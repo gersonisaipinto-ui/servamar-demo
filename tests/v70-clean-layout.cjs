@@ -1,0 +1,13 @@
+const assert=require('node:assert/strict'),fs=require('node:fs');
+const html=fs.readFileSync('templates/index.html','utf8');
+const js=fs.readFileSync('static/demo-vessels.js','utf8');
+const css=fs.readFileSync('static/style.css','utf8');
+const demo=html.slice(html.indexOf('id="tab-bdpruebas"'),html.indexOf('{% endif %}',html.indexOf('id="tab-bdpruebas"')));
+for(const id of ['dbdemo-form','dbdemo-list','dbdemo-movement-panel','dbdemo-audit','dbdemo-backup-status'])assert.equal((demo.match(new RegExp('id="'+id+'"','g'))||[]).length,1,id);
+assert.ok(demo.indexOf('id="dbdemo-list"')<demo.indexOf('id="dbdemo-form"'));
+assert.match(demo,/<details id="dbdemo-editor-fold"/);
+assert.match(demo,/<details class="dbdemo-tools-fold"/);
+assert.match(js,/if\(editor&&r\)editor\.open=true/);
+assert.match(js,/confirm_archive:confirmation/);
+assert.match(css,/\.dbdemo-heading/);
+console.log('V70 visual organization checks passed');
