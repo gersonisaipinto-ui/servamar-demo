@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SERVAMAR | Control de embarcaciones</title><link rel="stylesheet" href="/static/style.css?v=66"></head>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SERVAMAR | Control de embarcaciones</title><link rel="stylesheet" href="/static/style.css?v=70"></head>
 <body>{% if demo_mode %}<aside style="position:sticky;top:0;z-index:9999;background:#fff3cd;color:#493b12;padding:12px 16px;text-align:center;font-weight:700;border-bottom:2px solid #e6bc40">PRUEBA GRATUITA · EXPEDIENTES OPERATIVOS SOLO LECTURA · LABORATORIO POSTGRESQL EDITABLE (DATOS FICTICIOS)</aside>{% endif %}<header class="topbar"><div class="brand"><div class="mark" aria-hidden="true">⚓</div><div><small>SERVAMAR · CONTROL DE EXPEDIENTES</small><h1>Embarcaciones</h1></div></div><div class="status"><span id="servamar-version">V40 · uso local</span></div></header>
 <main>
 <nav class="tabs" aria-label="Secciones principales">
@@ -95,11 +95,13 @@
 
 {% if demo_mode %}
 <section id="tab-bdpruebas" class="tab-panel" hidden>
-<section class="panel">
-<h2>Laboratorio de base de datos — PostgreSQL</h2>
-<p class="muted">Esta sección permite crear, modificar, registrar movimientos y eliminar embarcaciones ficticias. Se guarda en PostgreSQL de prueba, completamente separado de la base operativa. También puedes iniciar un registro ficticio desde «Nuevo ingreso» y encontrarlo mediante «Buscar». No se permiten registros reales: usa DEMO-.</p>
-<p><strong>Atención:</strong> PostgreSQL Free vence el 13/12/2026. No introduzcas información de clientes, documentos ni expedientes auténticos. El cálculo de fechas es orientativo, no una autorización aduanera.</p>
-<div id="dbdemo-form">
+<section class="panel dbdemo-workspace">
+<div class="dbdemo-heading"><div><h2>Embarcaciones de prueba</h2><p class="muted">Consulta tus registros y selecciona una embarcación para editarla o gestionar sus movimientos.</p></div><span class="dbdemo-mode">Neon · DEMO</span></div>
+<details class="dbdemo-notice"><summary>Información importante de esta prueba</summary><p>Solo se permiten datos ficticios (DEMO-). No introduzcas información de clientes ni documentos reales. El entorno gratuito de prueba tiene límites y requiere respaldos; los cálculos son orientativos, no autorizaciones aduaneras.</p></details>
+<div class="dbdemo-list-section"><div class="dbdemo-section-heading"><h3>Expedientes</h3><button class="secondary small-btn" type="button" onclick="servamarDemoRefresh()">Actualizar lista</button></div><div class="tablewrap"><p id="dbdemo-count" class="muted">Cargando registros...</p><div id="dbdemo-list"></div></div>
+</div>
+<details id="dbdemo-editor-fold" class="dbdemo-editor-fold"><summary>Nuevo ingreso / editar expediente <span class="dbdemo-summary-hint">Formulario y movimientos</span></summary>
+<div class="dbdemo-editor-content"><div id="dbdemo-form">
 <h3 id="dbdemo-title">Nuevo registro ficticio</h3>
 <div class="grid">
 <label class="field">Número de registro ficticio<input id="dbdemo-registration" maxlength="29" placeholder="DEMO-001" autocomplete="off"></label>
@@ -118,7 +120,6 @@
 </div>
 <p id="dbdemo-status" class="muted" aria-live="polite">Laboratorio independiente de la base operativa.</p>
 </div>
-<div class="tablewrap"><p id="dbdemo-count" class="muted">Cargando registros...</p><div id="dbdemo-list"></div></div>
 <div id="dbdemo-movement-panel" class="panel" hidden>
 <h3>Registrar movimiento de embarcación ficticia</h3>
 <p id="dbdemo-movement-selected" class="muted"></p>
@@ -140,7 +141,8 @@
 <div id="dbdemo-movement-history" class="muted"></div>
 <p class="muted">La fecha de vencimiento se recalcula según el tipo de movimiento. Una salida temporal impide depósito o ampliación hasta registrar retorno. Este laboratorio es una simulación, no una autorización oficial.</p>
 </div>
-<div id="dbdemo-audit" class="muted" aria-live="polite"></div>
+</div></details>
+<details class="dbdemo-tools-fold"><summary>Herramientas adicionales <span class="dbdemo-summary-hint">Auditoría y respaldos</span></summary><div class="dbdemo-tools-content"><div class="actions"><button class="secondary" type="button" onclick="servamarDemoAudit()">Consultar historial de cambios</button></div><div id="dbdemo-audit" class="muted" aria-live="polite"></div>
 <section style="border-top:1px solid #d5dfeb;margin-top:18px;padding-top:14px">
 <h3>Respaldo de PostgreSQL DEMO</h3>
 <p class="muted">Descarga un ZIP con embarcaciones ficticias, movimientos y auditoría, más un manifiesto SHA-256. No incluye datos de clientes ni suscripciones push. La restauración automática aún no está habilitada. Guarda la copia antes del 13/12/2026.</p>
@@ -148,7 +150,8 @@
 <button class="secondary" type="button" onclick="servamarDemoBackupStatus()">Comprobar contenido del respaldo</button></div>
 <p id="dbdemo-backup-status" class="muted" aria-live="polite"></p>
 </section>
+</div></details>
 </section></section>
 {% endif %}
 <section id="detail" class="panel detail-panel" hidden></section>
-</main><footer>Fechas en dd/mm/yyyy · Los avisos a clientes requieren correo válido, consentimiento y confirmación del envío.</footer><script src="/static/app.js?v=65"></script><script src="/static/date-inputs.js?v=58" defer></script><script src="/static/push-demo.js?v=66" defer></script>{% if demo_mode %}<script src="/static/demo-vessels.js?v=69" defer></script><script src="/static/report-preview.js?v=61" defer></script>{% endif %}</body></html>
+</main><footer>Fechas en dd/mm/yyyy · Los avisos a clientes requieren correo válido, consentimiento y confirmación del envío.</footer><script src="/static/app.js?v=65"></script><script src="/static/date-inputs.js?v=58" defer></script><script src="/static/push-demo.js?v=66" defer></script>{% if demo_mode %}<script src="/static/demo-vessels.js?v=70" defer></script><script src="/static/report-preview.js?v=61" defer></script>{% endif %}</body></html>
