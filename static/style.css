@@ -308,3 +308,20 @@ button:disabled{opacity:.5;cursor:not-allowed}
  .dbdemo-editor-fold>summary,.dbdemo-tools-fold>summary{padding:13px}
  .dbdemo-workspace .dbdemo-vessels-table td{padding:8px 10px}
 }
+
+
+/* V71: consistent disclosure panels throughout the application */
+.sv-fold{border:1px solid #e1e9ee;border-radius:12px;background:#fff;margin:12px 0;overflow:visible}
+.sv-fold>summary{cursor:pointer;padding:14px 16px;font-weight:700;font-size:14px;color:#24485c;list-style-position:inside;user-select:none}
+.sv-fold[open]>summary{background:#f8fbfc;border-bottom:1px solid #e7edf1;border-radius:12px 12px 0 0}
+.sv-fold>section.panel{border:0;box-shadow:none;margin:0;border-radius:0}
+.sv-fold>.stats{padding:14px;margin:0}
+.sv-fold>.grid,.sv-fold>.search-grid,.sv-fold>.actions,.sv-fold>.tablewrap,.sv-fold>.muted,.sv-fold>pre,.sv-fold>.help,.sv-fold>.sv-fold-body{margin-left:16px;margin-right:16px}
+.sv-fold>.grid,.sv-fold>.search-grid{margin-top:14px}
+.sv-fold>.actions{margin-top:14px}
+.sv-fold>.tablewrap{margin-bottom:15px}
+.sv-fold>.muted,.sv-fold>pre{margin-bottom:12px}
+.sv-fold .sv-fold-body{padding:14px 0}
+.sv-fold>summary:focus-visible{outline:2px solid #176176;outline-offset:3px}
+#tab-avisos #webpush-demo{border:0!important;padding:14px!important;margin:0!important}
+@media(max-width:650px){.sv-fold>summary{padding:13px;font-size:13px}.sv-fold>.grid,.sv-fold>.search-grid,.sv-fold>.actions,.sv-fold>.tablewrap,.sv-fold>.muted,.sv-fold>pre,.sv-fold>.help,.sv-fold>.sv-fold-body{margin-left:12px;margin-right:12px}}
