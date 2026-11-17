@@ -295,4 +295,17 @@ class DatabaseTests(ConsoleTests):
         super().test_connection_rejects_wrong_branch_host_and_database()
 
 
+@unittest.skipUnless(target.TEST_HOST in os.getenv('V90_TEST_POSTGRES_URL', '').replace('-pooler.', '.'),
+                     'Requires the pinned Neon testing endpoint')
+class NeonConnectionTests(unittest.TestCase):
+    def test_direct_and_pooled_connections_apply_transaction_limits(self):
+        url = os.environ['V90_TEST_POSTGRES_URL'].replace('-pooler.c-4.', '.c-4.')
+        for connection_url in (url, url.replace('.c-4.', '-pooler.c-4.')):
+            with self.subTest(pooled='-pooler.' in connection_url):
+                with patch.dict(os.environ, SERVAMAR_PG_TEST_DATABASE_URL=connection_url):
+                    with target.connection() as db:
+                        row = db.execute("SELECT current_database(),current_setting('statement_timeout'),current_setting('lock_timeout')").fetchone()
+                        self.assertEqual(row, ('servamar_demo', '10s', '5s'))
+
+
 if __name__ == '__main__': unittest.main()

@@ -94,8 +94,16 @@ def connection():
             or parsed.hostname not in (TEST_HOST, TEST_HOST.replace('.c-4.', '-pooler.c-4.'))
             or parsed.path != '/servamar_demo'):
         raise RuntimeError('Unexpected test database target')
-    return psycopg.connect(url, connect_timeout=8, sslmode='require',
-                           options='-c statement_timeout=10000 -c lock_timeout=5000')
+    db = psycopg.connect(url, connect_timeout=8, sslmode='require')
+    try:
+        # PgBouncer rejects these startup options. Keep limits transaction-local
+        # so the pooled backend never leaks settings into the next request.
+        db.execute("SET LOCAL statement_timeout = '10s'")
+        db.execute("SET LOCAL lock_timeout = '5s'")
+    except Exception:
+        db.close()
+        raise
+    return db
 
 
 def ensure_test_declaration(declaration):
