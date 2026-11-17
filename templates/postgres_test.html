@@ -12,6 +12,15 @@
   <p>Administra registros ficticios y consulta sus movimientos.</p></header>
   <aside class="notice"><strong>Solo datos ficticios.</strong> Este entorno está separado de la aplicación original. Los movimientos no calculan vencimientos ni envían notificaciones.</aside>
   <p id="message" role="status" aria-live="polite"></p>
+  <section aria-labelledby="search-title"><h2 id="search-title">Buscar y reportar</h2>
+    <form id="search-form"><div class="grid">
+      <label>Embarcación, capitán o matrícula<input name="q" maxlength="120" placeholder="Buscar registros ficticios"></label>
+      <label>Mes de vencimiento<input name="month" type="month"></label>
+    </div><button type="submit">Buscar</button><button id="clear-search" type="button" class="secondary">Limpiar</button>
+    <button id="export-csv" type="button" class="secondary">Exportar CSV</button></form>
+    <p id="search-count" aria-live="polite"></p><div id="search-results" class="cards"></div>
+    <h3>Próximos 30 días</h3><div id="expiring-results" class="cards"></div>
+  </section>
   <section aria-labelledby="list-title"><div class="section-heading"><h2 id="list-title">Registros de prueba</h2><div><button id="refresh" type="button" class="secondary">Actualizar</button><button id="new-vessel" type="button">Agregar embarcación</button></div></div>
     <div id="rows" class="cards" aria-live="polite"><p>Cargando registros…</p></div>
   </section>
