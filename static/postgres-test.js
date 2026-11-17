@@ -42,7 +42,7 @@ function showEditor(v=null) {
 }
 async function openEdit(id) { const data=await api('/api/test/vessels/'+id); showEditor(data.vessel); }
 async function openHistory(id) {
-  const [detail,history]=await Promise.all([api('/api/test/vessels/'+id),api('/api/test/vessels/'+id+'/movements')]);
+  const [detail,history,contacts]=await Promise.all([api('/api/test/vessels/'+id),api('/api/test/vessels/'+id+'/movements'),api('/api/test/vessels/'+id+'/contacts')]);
   selected=detail.vessel; editing=null; $('#editor').hidden=true; $('#detail').hidden=false;
   $('#detail-name').textContent=selected.declaration+' · '+selected.name;
   $('#movements').replaceChildren(...history.movements.map(m=>{
@@ -52,14 +52,27 @@ async function openHistory(id) {
     if(m.description)item.append(node('p',m.description)); return item;
   }));
   if(!history.movements.length) $('#movements').append(node('p','Todavía no hay movimientos registrados.','muted'));
+  $('#contacts').replaceChildren(...contacts.contacts.map(contact=>{
+    const item=node('article','','movement');
+    item.append(node('strong',contact.full_name+(contact.is_primary?' · Principal':'')),
+      node('p',contact.contact_role+' · '+(contact.email||'Sin correo')+' · '+(contact.phone||'Sin teléfono')),
+      action('Quitar contacto',async()=>{
+        if(!confirm('¿Quitar este contacto ficticio?'))return;
+        await api('/api/test/vessels/'+id+'/contacts/'+contact.id,'DELETE',{version:selected.version});
+        message('Contacto eliminado.');await openHistory(id);
+      }));
+    return item;
+  }));
+  if(!contacts.contacts.length)$('#contacts').append(node('p','Sin contactos ficticios.','muted'));
+  $('#contact-form').reset();
   $('#movement-form').reset(); $('#detail-title').focus();
 }
 async function openDelete(id) {
   const data=await api('/api/test/vessels/'+id); deleting=data.vessel;
   $('#delete-form').reset(); $('#delete-error').textContent='';
-  const blocked=data.dependencies.movements+data.dependencies.alerts>0;
+  const blocked=Object.values(data.dependencies).some(count=>count>0);
   $('#delete-explanation').textContent=blocked
-    ? 'No se puede eliminar '+deleting.declaration+': tiene '+data.dependencies.movements+' movimientos y '+data.dependencies.alerts+' alertas vinculadas. Se conservarán todos los registros.'
+    ? 'No se puede eliminar '+deleting.declaration+': tiene '+data.dependencies.movements+' movimientos, '+data.dependencies.alerts+' alertas y otros registros vinculados. Se conservarán todos los registros.'
     : 'Se eliminará '+deleting.declaration+' · '+deleting.name+'. La acción conserva un registro de auditoría.';
   $('#confirm-delete').disabled=blocked; $('#delete-form').elements.confirmation.disabled=blocked;
   $('#delete-dialog').showModal();
@@ -98,3 +111,14 @@ $('#delete-form').onsubmit=async event=>{
   finally { $('#confirm-delete').disabled=false; }
 };
 refresh().catch(error=>message(error.message,true));
+
+$('#contact-form').onsubmit=event=>{
+  event.preventDefault();const form=event.target;const current=selected;
+  if(!current)return;
+  busy(form,async()=>{
+    const data=Object.fromEntries(new FormData(form));
+    data.is_primary=form.elements.is_primary.checked;data.version=current.version;
+    await api('/api/test/vessels/'+current.id+'/contacts','POST',data);
+    message('Contacto ficticio guardado.');await openHistory(current.id);
+  });
+};
