@@ -1,0 +1,36 @@
+name: SERVAMAR V90 isolated PostgreSQL tests
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, feature/v90-postgres-vessels]
+    paths: ['postgres_test_app.py', 'postgres_test_migrate.py', 'templates/postgres_test.html', 'static/postgres-test.*', 'tests/test_v90*', 'tests/test_v89*', 'migrations/v90*', '.github/workflows/v90-postgres-test.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: local-ci-only
+          POSTGRES_DB: servamar_v90_ci
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d servamar_v90_ci"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      V90_TEST_POSTGRES_URL: postgresql://postgres:local-ci-only@localhost:5432/servamar_v90_ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install 'Flask>=3,<4' 'psycopg[binary]>=3.3,<4'
+      - run: python -m py_compile postgres_test_app.py postgres_test_migrate.py
+      - run: node --check static/postgres-test.js
+      - run: python -m unittest discover -s tests -p 'test_v89_*.py' -v
+      - run: python -m unittest discover -s tests -p 'test_v90_*.py' -v

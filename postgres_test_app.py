@@ -1,100 +1,324 @@
-"""V89: standalone SERVAMAR PostgreSQL TEST console.
-
-Never import or modify the production Flask app. Deploy separately with
-SERVAMAR_PG_TEST_MODE=YES, SERVAMAR_PG_TEST_DATABASE_URL pointing to the
-dedicated Neon testing branch and SERVAMAR_PG_TEST_PASSWORD (>=16 chars).
-Only fictitious records are permitted. No email or push integrations.
-"""
-import hmac,os,re
+"""SERVAMAR V90: independent fictional PostgreSQL console. Never imports app.py."""
+import hashlib
+import hmac
+import os
+import re
 from datetime import date
 from functools import wraps
-from flask import Flask,request,jsonify,Response
-app=Flask(__name__)
+from urllib.parse import urlsplit
+
+from flask import Flask, Response, jsonify, render_template, request
+from werkzeug.exceptions import HTTPException
+
+app = Flask(__name__, static_folder=None)
+app.config['MAX_CONTENT_LENGTH'] = 32 * 1024
+TEST_BRANCH = 'br-green-band-arsmtoxc'
+TEST_HOST = 'ep-spring-sunset-arxamsuy.c-4.us-west-2.aws.neon.tech'
+KINDS = ('ingreso', 'ampliacion', 'deposito', 'salida', 'retorno', 'cierre')
+FIELDS = ('id', 'declaration', 'name', 'captain', 'stage', 'start_date', 'expiry_date', 'version')
+SELECT_VESSEL = 'SELECT ' + ','.join(FIELDS) + ' FROM servamar_test.vessels'
+
+
 def configured():
- return (os.getenv("SERVAMAR_PG_TEST_MODE")=="YES" and
-         len(os.getenv("SERVAMAR_PG_TEST_PASSWORD",""))>=16 and
-         bool(os.getenv("SERVAMAR_PG_TEST_DATABASE_URL")) and
-         os.getenv("SERVAMAR_PG_TEST_BRANCH_ID")=="br-green-band-arsmtoxc")
+    return (os.getenv('SERVAMAR_PG_TEST_MODE') == 'YES'
+            and len(os.getenv('SERVAMAR_PG_TEST_PASSWORD', '')) >= 16
+            and bool(os.getenv('SERVAMAR_PG_TEST_DATABASE_URL'))
+            and os.getenv('SERVAMAR_PG_TEST_BRANCH_ID') == TEST_BRANCH)
+
+
 def authorized():
- auth=request.authorization
- return bool(auth and hmac.compare_digest(auth.username or "",os.getenv("SERVAMAR_PG_TEST_USERNAME","servamar-test")) and hmac.compare_digest(auth.password or "",os.getenv("SERVAMAR_PG_TEST_PASSWORD","")))
+    auth = request.authorization
+    return bool(auth and auth.type == 'basic'
+                and hmac.compare_digest((auth.username or '').encode(),
+                                        os.getenv('SERVAMAR_PG_TEST_USERNAME', 'servamar-test').encode())
+                and hmac.compare_digest((auth.password or '').encode(),
+                                        os.getenv('SERVAMAR_PG_TEST_PASSWORD', '').encode()))
+
+
+def csrf_token():
+    # Stable across workers; invalidated when the private password rotates.
+    return hmac.new(os.environ['SERVAMAR_PG_TEST_PASSWORD'].encode(),
+                    b'servamar-v90-csrf', hashlib.sha256).hexdigest()
+
+
+class ApiError(ValueError):
+    def __init__(self, message, status=400):
+        super().__init__(message)
+        self.status = status
+
+
 def protected(fn):
- @wraps(fn)
- def wrapped(*args,**kwargs):
-  if not configured():return jsonify(error="PostgreSQL test console disabled"),503
-  if not authorized():return Response("Authentication required",401,{"WWW-Authenticate":'Basic realm="SERVAMAR TEST"'})
-  if os.getenv("SERVAMAR_PG_TEST_REQUIRE_HTTPS","YES")=="YES" and request.headers.get("X-Forwarded-Proto","https").split(",")[0].strip()!="https":
-   return jsonify(error="HTTPS required"),403
-  return fn(*args,**kwargs)
- return wrapped
+    @wraps(fn)
+    def wrapped(*args, **kwargs):
+        if not configured():
+            return jsonify(error='Consola de pruebas deshabilitada'), 503
+        if not authorized():
+            return Response('Authentication required', 401,
+                            {'WWW-Authenticate': 'Basic realm="SERVAMAR TEST"'})
+        if (os.getenv('SERVAMAR_PG_TEST_REQUIRE_HTTPS', 'YES') == 'YES'
+                and request.headers.get('X-Forwarded-Proto', request.scheme).split(',')[0].strip() != 'https'):
+            return jsonify(error='Se requiere HTTPS'), 403
+        if request.method in ('POST', 'PUT', 'PATCH', 'DELETE'):
+            origin = request.headers.get('Origin')
+            if origin and origin != 'https://' + request.host:
+                return jsonify(error='Origen no permitido'), 403
+            token = request.headers.get('X-CSRF-Token', '')
+            if not hmac.compare_digest(token.encode(), csrf_token().encode()):
+                return jsonify(error='Recarga la página antes de guardar'), 403
+            if not request.is_json:
+                return jsonify(error='Se requiere un objeto JSON'), 415
+        try:
+            return fn(*args, **kwargs)
+        except ApiError as exc:
+            return jsonify(error=str(exc)), exc.status
+        except HTTPException as exc:
+            return jsonify(error='Solicitud inválida o demasiado grande'), exc.code
+        except (ValueError, TypeError):
+            return jsonify(error='Datos inválidos'), 400
+        except Exception as exc:
+            if getattr(exc, 'sqlstate', None) == '23505':
+                return jsonify(error='Registro de prueba duplicado'), 409
+            if getattr(exc, 'sqlstate', None) in ('23503', '23001'):
+                return jsonify(error='No se puede eliminar: existen registros vinculados'), 409
+            # Never expose connection strings, SQL parameters or driver errors.
+            app.logger.error('PostgreSQL test request failed: %s', type(exc).__name__)
+            return jsonify(error='No fue posible completar la operación; vuelve a intentarlo'), 503
+    return wrapped
+
+
 def connection():
- import psycopg
- return psycopg.connect(os.environ["SERVAMAR_PG_TEST_DATABASE_URL"],connect_timeout=8)
+    import psycopg
+    url = os.environ['SERVAMAR_PG_TEST_DATABASE_URL']
+    parsed = urlsplit(url)
+    if (parsed.scheme not in ('postgres', 'postgresql')
+            or parsed.hostname not in (TEST_HOST, TEST_HOST.replace('.c-4.', '-pooler.c-4.'))
+            or parsed.path != '/servamar_demo'):
+        raise RuntimeError('Unexpected test database target')
+    return psycopg.connect(url, connect_timeout=8, sslmode='require',
+                           options='-c statement_timeout=10000 -c lock_timeout=5000')
+
+
 def ensure_test_declaration(declaration):
- if not re.fullmatch(r"ST-(?:DEMO|TEST)-[A-Z0-9-]{1,40}",declaration or ""):
-  raise ValueError("Solo se permiten registros ficticios ST-DEMO- o ST-TEST-")
+    if not isinstance(declaration, str) or not re.fullmatch(r'ST-(?:DEMO|TEST)-[A-Z0-9-]{1,40}', declaration):
+        raise ApiError('Solo se permiten registros ficticios ST-DEMO- o ST-TEST-')
+
+
 def parse_date(value):
- if value is None or value=="":return None
- return date.fromisoformat(value)
-@app.get("/healthz")
+    """ISO remains supported for V89 API callers; the UI uses dd/mm/yyyy."""
+    if value is None or value == '':
+        return None
+    if not isinstance(value, str):
+        raise ApiError('Fecha inválida; utiliza dd/mm/yyyy')
+    try:
+        if re.fullmatch(r'\d{2}/\d{2}/\d{4}', value):
+            day, month, year = map(int, value.split('/'))
+            return date(year, month, day)
+        if re.fullmatch(r'\d{4}-\d{2}-\d{2}', value):
+            return date.fromisoformat(value)
+    except ValueError:
+        pass
+    raise ApiError('Fecha inválida; utiliza dd/mm/yyyy')
+
+
+def payload():
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        raise ApiError('Se requiere un objeto JSON')
+    return data
+
+
+def text_field(data, field, limit, required=True):
+    value = data.get(field, '')
+    if not isinstance(value, str) or len(value.strip()) > limit or (required and not value.strip()):
+        raise ApiError('Campo inválido: ' + field)
+    return value.strip()
+
+
+def vessel_data(data):
+    declaration = text_field(data, 'declaration', 48).upper()
+    ensure_test_declaration(declaration)
+    name = text_field(data, 'name', 200)
+    captain = text_field(data, 'captain', 200)
+    start, expiry = parse_date(data.get('start_date')), parse_date(data.get('expiry_date'))
+    if start and expiry and expiry < start:
+        raise ApiError('Vencimiento anterior al ingreso')
+    return declaration, name, captain, start, expiry
+
+
+def as_vessel(row):
+    return dict(zip(FIELDS, [x.isoformat() if isinstance(x, date) else x for x in row]))
+
+
+def get_vessel(db, vessel_id, lock=False):
+    row = db.execute(SELECT_VESSEL + ' WHERE id=%s' + (' FOR UPDATE' if lock else ''), (vessel_id,)).fetchone()
+    if not row:
+        raise ApiError('Embarcación inexistente', 404)
+    ensure_test_declaration(row[1])
+    return as_vessel(row)
+
+
+def check_version(data, vessel):
+    if type(data.get('version')) is not int or data['version'] < 1:
+        raise ApiError('Versión del registro requerida')
+    if data['version'] != vessel['version']:
+        raise ApiError('El registro cambió. Recarga y revisa antes de guardar', 409)
+
+
+def audit(db, vessel_id, action, before, after):
+    from psycopg.types.json import Jsonb
+    db.execute('INSERT INTO servamar_test.v90_audit(vessel_id,action,before_state,after_state,actor) '
+               'VALUES (%s,%s,%s,%s,%s)',
+               (vessel_id, action, Jsonb(before), Jsonb(after), request.authorization.username))
+
+
+@app.after_request
+def security_headers(response):
+    response.headers['Cache-Control'] = 'no-store'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['Referrer-Policy'] = 'same-origin'
+    response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self'; style-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+    return response
+
+
+@app.get('/healthz')
 def health():
- return jsonify(service="servamar-postgres-test",configured=configured())
-@app.get("/")
+    return jsonify(service='servamar-postgres-test', version='V90', configured=configured())
+
+
+@app.get('/')
 @protected
 def home():
- return Response("""<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SERVAMAR | PostgreSQL pruebas</title><style>body{font:16px system-ui;margin:24px auto;max-width:900px;padding:0 14px}input,select,button{font:inherit;padding:8px;margin:4px}table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid #ccc;padding:8px;text-align:left}small{color:#666}</style><h1>SERVAMAR · Base PostgreSQL de pruebas</h1><p><strong>SOLO DATOS FICTICIOS.</strong> No es la base operativa de clientes.</p><form id="new"><input name="declaration" placeholder="ST-TEST-004" required><input name="name" placeholder="Nombre de prueba" required><input name="captain" placeholder="Capitán ficticio" required><input name="start_date" type="date"><input name="expiry_date" type="date"><button>Agregar embarcación</button></form><p id="message" role="status"></p><table><thead><tr><th>Registro</th><th>Embarcación</th><th>Capitán</th><th>Etapa</th><th>Vencimiento</th></tr></thead><tbody id="rows"></tbody></table><script>async function refresh(){const r=await fetch('/api/test/vessels');const j=await r.json();document.querySelector('#rows').replaceChildren(...j.vessels.map(v=>{const tr=document.createElement('tr');[v.declaration,v.name,v.captain,v.stage,v.expiry_date||''].forEach(s=>{const td=document.createElement('td');td.textContent=s;tr.append(td)});return tr}))}document.querySelector('#new').onsubmit=async e=>{e.preventDefault();const body=Object.fromEntries(new FormData(e.target));const r=await fetch('/api/test/vessels',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const j=await r.json();document.querySelector('#message').textContent=r.ok?'Registro ficticio guardado':(j.error||'Error');if(r.ok){e.target.reset();refresh()}};refresh()</script></html>""",mimetype="text/html")
-@app.get("/api/test/vessels")
+    return render_template('postgres_test.html', csrf=csrf_token())
+
+
+@app.get('/test-assets/<asset>')
+@protected
+def asset_file(asset):
+    from flask import send_from_directory
+    if asset not in ('postgres-test.js', 'postgres-test.css'):
+        raise ApiError('Archivo inexistente', 404)
+    return send_from_directory('static', asset)
+
+
+@app.get('/api/test/vessels')
 @protected
 def vessels():
- with connection() as db:
-  rows=db.execute("SELECT id,declaration,name,captain,stage,start_date,expiry_date FROM servamar_test.vessels ORDER BY expiry_date NULLS LAST,id").fetchall()
- return jsonify(vessels=[dict(zip(("id","declaration","name","captain","stage","start_date","expiry_date"),[x.isoformat() if isinstance(x,date) else x for x in row])) for row in rows])
-@app.post("/api/test/vessels")
+    with connection() as db:
+        rows = db.execute(SELECT_VESSEL + ' ORDER BY expiry_date NULLS LAST,id').fetchall()
+    return jsonify(vessels=[as_vessel(row) for row in rows])
+
+
+@app.post('/api/test/vessels')
 @protected
 def add_vessel():
- try:
-  data=request.get_json(silent=True) or {}
-  declaration=str(data.get("declaration","")).strip().upper()
-  ensure_test_declaration(declaration)
-  name=str(data.get("name","")).strip();captain=str(data.get("captain","")).strip()
-  if not name or not captain or len(name)>200 or len(captain)>200:raise ValueError("Nombre y capitán ficticios requeridos")
-  start=parse_date(data.get("start_date"));expiry=parse_date(data.get("expiry_date"))
-  if start and expiry and expiry<start:raise ValueError("Vencimiento anterior al ingreso")
-  with connection() as db:
-   row=db.execute("INSERT INTO servamar_test.vessels(id,declaration,name,captain,stage,start_date,expiry_date,validated,notes) VALUES ((SELECT COALESCE(MAX(id),0)+1 FROM servamar_test.vessels),%s,%s,%s,'ingreso',%s,%s,FALSE,'DATOS FICTICIOS: PRUEBA GRATUITA') RETURNING id",(declaration,name,captain,start,expiry)).fetchone()
-  return jsonify(id=row[0],created=True),201
- except (ValueError,TypeError) as exc:return jsonify(error=str(exc)),400
- except Exception as exc:
-  if getattr(exc,"sqlstate",None)=="23505":return jsonify(error="Registro de prueba duplicado"),409
-  raise
-@app.get("/api/test/vessels/<int:vessel_id>/alerts")
+    values = vessel_data(payload())
+    with connection() as db:
+        row = db.execute("INSERT INTO servamar_test.vessels(declaration,name,captain,stage,start_date,expiry_date,validated,notes) "
+                         "VALUES (%s,%s,%s,'ingreso',%s,%s,FALSE,'DATOS FICTICIOS: PRUEBA GRATUITA') RETURNING id", values).fetchone()
+        vessel = get_vessel(db, row[0])
+        audit(db, row[0], 'create', None, vessel)
+    return jsonify(id=row[0], created=True, vessel=vessel), 201
+
+
+@app.get('/api/test/vessels/<int:vessel_id>')
+@protected
+def vessel_detail(vessel_id):
+    with connection() as db:
+        vessel = get_vessel(db, vessel_id)
+        counts = db.execute('SELECT (SELECT count(*) FROM servamar_test.history WHERE vessel_id=%s),'
+                            '(SELECT count(*) FROM servamar_test.alert_settings WHERE vessel_id=%s)',
+                            (vessel_id, vessel_id)).fetchone()
+    return jsonify(vessel=vessel, dependencies=dict(movements=counts[0], alerts=counts[1]))
+
+
+@app.put('/api/test/vessels/<int:vessel_id>')
+@protected
+def edit_vessel(vessel_id):
+    data = payload()
+    values = vessel_data(data)
+    with connection() as db:
+        before = get_vessel(db, vessel_id, lock=True)
+        check_version(data, before)
+        if values[3]:
+            earliest = db.execute('SELECT min(event_date) FROM servamar_test.history WHERE vessel_id=%s', (vessel_id,)).fetchone()[0]
+            if earliest and values[3] > earliest:
+                raise ApiError('El ingreso no puede ser posterior al historial de movimientos')
+        db.execute('UPDATE servamar_test.vessels SET declaration=%s,name=%s,captain=%s,start_date=%s,expiry_date=%s,version=version+1 WHERE id=%s', (*values, vessel_id))
+        vessel = get_vessel(db, vessel_id)
+        audit(db, vessel_id, 'edit', before, vessel)
+    return jsonify(vessel=vessel, updated=True)
+
+
+@app.delete('/api/test/vessels/<int:vessel_id>')
+@protected
+def delete_vessel(vessel_id):
+    data = payload()
+    with connection() as db:
+        vessel = get_vessel(db, vessel_id, lock=True)
+        check_version(data, vessel)
+        if data.get('confirm_declaration') != vessel['declaration']:
+            raise ApiError('Escribe la matrícula exacta para confirmar la eliminación')
+        counts = db.execute('SELECT (SELECT count(*) FROM servamar_test.history WHERE vessel_id=%s),'
+                            '(SELECT count(*) FROM servamar_test.alert_settings WHERE vessel_id=%s)',
+                            (vessel_id, vessel_id)).fetchone()
+        if any(counts):
+            raise ApiError('Eliminación bloqueada: existen movimientos o alertas vinculadas', 409)
+        # The foreign keys remain RESTRICT; never delete child records here.
+        db.execute('DELETE FROM servamar_test.vessels WHERE id=%s', (vessel_id,))
+        audit(db, vessel_id, 'delete', vessel, None)
+    return jsonify(deleted=True, id=vessel_id)
+
+
+@app.get('/api/test/vessels/<int:vessel_id>/alerts')
 @protected
 def alerts(vessel_id):
- with connection() as db:
-  rows=db.execute("SELECT days_before,enabled FROM servamar_test.alert_settings WHERE vessel_id=%s ORDER BY days_before DESC",(vessel_id,)).fetchall()
- return jsonify(alerts=[{"days_before":r[0],"enabled":r[1]} for r in rows])
-@app.get("/api/test/vessels/<int:vessel_id>/movements")
+    with connection() as db:
+        get_vessel(db, vessel_id)
+        rows = db.execute('SELECT days_before,enabled FROM servamar_test.alert_settings WHERE vessel_id=%s ORDER BY days_before DESC', (vessel_id,)).fetchall()
+    return jsonify(alerts=[dict(days_before=r[0], enabled=r[1]) for r in rows])
+
+
+@app.get('/api/test/vessels/<int:vessel_id>/movements')
 @protected
 def movements(vessel_id):
- with connection() as db:
-  rows=db.execute("SELECT id,kind,event_date,expiry_date,description FROM servamar_test.history WHERE vessel_id=%s ORDER BY event_date,id",(vessel_id,)).fetchall()
- return jsonify(movements=[{"id":r[0],"kind":r[1],"event_date":r[2].isoformat() if r[2] else None,"expiry_date":r[3].isoformat() if r[3] else None,"description":r[4]} for r in rows])
-@app.post("/api/test/vessels/<int:vessel_id>/movements")
+    with connection() as db:
+        get_vessel(db, vessel_id)
+        rows = db.execute('SELECT id,kind,event_date,expiry_date,description FROM servamar_test.history WHERE vessel_id=%s ORDER BY event_date NULLS LAST,id', (vessel_id,)).fetchall()
+    keys = ('id', 'kind', 'event_date', 'expiry_date', 'description')
+    return jsonify(movements=[dict(zip(keys, [v.isoformat() if isinstance(v, date) else v for v in row])) for row in rows])
+
+
+@app.post('/api/test/vessels/<int:vessel_id>/movements')
 @protected
 def add_movement(vessel_id):
- try:
-  data=request.get_json(silent=True) or {}
-  kind=str(data.get("kind","")).strip()
-  if kind not in ("ingreso","ampliacion","deposito","salida","retorno","cierre"):raise ValueError("Tipo de movimiento inválido")
-  event_date=parse_date(data.get("event_date"))
-  if not event_date:raise ValueError("Fecha del movimiento requerida")
-  with connection() as db:
-   vessel=db.execute("SELECT declaration FROM servamar_test.vessels WHERE id=%s",(vessel_id,)).fetchone()
-   if not vessel:return jsonify(error="Embarcación inexistente"),404
-   ensure_test_declaration(vessel[0])
-   row=db.execute("INSERT INTO servamar_test.history(id,vessel_id,kind,event_date,description) VALUES ((SELECT COALESCE(MAX(id),0)+1 FROM servamar_test.history),%s,%s,%s,%s) RETURNING id",(vessel_id,kind,event_date,"Movimiento ficticio de prueba")).fetchone()
-  return jsonify(id=row[0],created=True),201
- except (ValueError,TypeError) as exc:return jsonify(error=str(exc)),400
-if __name__=="__main__":
- if not configured():raise SystemExit("Test configuration incomplete")
- app.run(host="127.0.0.1",port=int(os.getenv("PORT","8790")),debug=False)
+    data = payload()
+    kind = text_field(data, 'kind', 30)
+    if kind not in KINDS:
+        raise ApiError('Tipo de movimiento inválido')
+    event_date, expiry = parse_date(data.get('event_date')), parse_date(data.get('expiry_date'))
+    if not event_date:
+        raise ApiError('Fecha del movimiento requerida')
+    if expiry and expiry < event_date:
+        raise ApiError('Vencimiento anterior al movimiento')
+    description = text_field(data, 'description', 2000, required=False)
+    with connection() as db:
+        vessel = get_vessel(db, vessel_id, lock=True)
+        check_version(data, vessel)
+        if vessel['start_date'] and event_date < date.fromisoformat(vessel['start_date']):
+            raise ApiError('Movimiento anterior al ingreso')
+        row = db.execute('INSERT INTO servamar_test.history(vessel_id,kind,event_date,expiry_date,description,created_at) '
+                         'VALUES (%s,%s,%s,%s,%s,CURRENT_TIMESTAMP::text) RETURNING id',
+                         (vessel_id, kind, event_date, expiry, description)).fetchone()
+        # Record events only: no unvalidated permit calculations or stage changes.
+        db.execute('UPDATE servamar_test.vessels SET version=version+1 WHERE id=%s', (vessel_id,))
+        audit(db, vessel_id, 'movement', None, dict(id=row[0], kind=kind, event_date=event_date.isoformat(),
+                                                 expiry_date=expiry.isoformat() if expiry else None, description=description))
+        updated = get_vessel(db, vessel_id)
+    return jsonify(id=row[0], created=True, vessel=updated), 201
+
+
+if __name__ == '__main__':
+    if not configured():
+        raise SystemExit('Test configuration incomplete')
+    app.run(host='127.0.0.1', port=int(os.getenv('PORT', '8790')), debug=False)

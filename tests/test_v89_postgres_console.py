@@ -19,5 +19,5 @@ class TestPostgresConsole(unittest.TestCase):
  def test_allows_fictional_declarations(self):
   target.ensure_test_declaration("ST-TEST-004")
  def test_rejects_invalid_date(self):
-  with self.assertRaises(ValueError):target.parse_date("17/11/2026")
+  with self.assertRaises(ValueError):target.parse_date("31/11/2026")
 if __name__=="__main__":unittest.main()
