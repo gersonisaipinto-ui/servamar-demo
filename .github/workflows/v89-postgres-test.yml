@@ -1,0 +1,16 @@
+name: SERVAMAR V89 PostgreSQL test console
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install 'Flask>=3,<4'
+      - run: python -m py_compile postgres_test_app.py
+      - run: python -m unittest discover -s tests -p 'test_v89_*.py' -v
