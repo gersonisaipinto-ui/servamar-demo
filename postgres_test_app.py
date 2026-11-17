@@ -332,6 +332,9 @@ def add_movement(vessel_id):
 from postgres_test_contacts import register as register_contacts
 register_contacts(app, protected, connection, get_vessel, check_version, audit, payload, text_field, ApiError)
 
+from postgres_test_reports import register as register_reports
+register_reports(app, protected, connection, ApiError)
+
 if __name__ == '__main__':
     if not configured():
         raise SystemExit('Test configuration incomplete')
