@@ -4,7 +4,7 @@ on:
     branches: [main]
   push:
     branches: [main, feature/v90-postgres-vessels]
-    paths: ['postgres_test_app.py', 'postgres_test_migrate.py', 'templates/postgres_test.html', 'static/postgres-test.*', 'tests/test_v90*', 'tests/test_v89*', 'migrations/v90*', '.github/workflows/v90-postgres-test.yml']
+    paths: ['postgres_test_*.py', 'tests/test_v92*', 'postgres_test_app.py', 'postgres_test_migrate.py', 'templates/postgres_test.html', 'static/postgres-test.*', 'tests/test_v90*', 'tests/test_v89*', 'migrations/v90*', '.github/workflows/v90-postgres-test.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -30,7 +30,8 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install 'Flask>=3,<4' 'psycopg[binary]>=3.3,<4'
-      - run: python -m py_compile postgres_test_app.py postgres_test_migrate.py
+      - run: python -m py_compile postgres_test_app.py postgres_test_migrate.py postgres_test_contacts.py postgres_test_reports.py
       - run: node --check static/postgres-test.js
       - run: python -m unittest discover -s tests -p 'test_v89_*.py' -v
       - run: python -m unittest discover -s tests -p 'test_v90_*.py' -v
+      - run: python -m unittest discover -s tests -p 'test_v92_*.py' -v

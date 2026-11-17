@@ -34,6 +34,7 @@ async function refresh() {
     return card;
   }));
   if(!data.vessels.length) $('#rows').append(node('p','No hay embarcaciones ficticias. Agrega la primera.'));
+  await Promise.all([searchRecords(),loadExpiring()]);
 }
 function showEditor(v=null) {
   editing=v; $('#vessel-form').reset(); $('#editor-title').textContent=v?'Editar embarcación':'Agregar embarcación';
@@ -122,3 +123,34 @@ $('#contact-form').onsubmit=event=>{
     message('Contacto ficticio guardado.');await openHistory(current.id);
   });
 };
+
+function searchParams() {
+  const data=new FormData($('#search-form'));
+  const params=new URLSearchParams();
+  for(const key of ['q','month'])if(data.get(key))params.set(key,data.get(key));
+  return params.toString();
+}
+async function searchRecords(){
+  const result=await api('/api/test/search?'+searchParams());
+  $('#search-count').textContent=result.count+' resultados'+(result.capped?' (límite de 1000)':'');
+  $('#search-results').replaceChildren(...result.vessels.map(v=>{
+    const item=node('article','','card');
+    item.append(node('strong',v.name),node('p',v.declaration+' · '+v.captain),
+      node('p','Vence: '+(displayDate(v.expiry_date)||'Sin fecha')),
+      action('Abrir historial',()=>openHistory(v.id)));
+    return item;
+  }));
+}
+async function loadExpiring(){
+  const result=await api('/api/test/expiring');
+  $('#expiring-results').replaceChildren(...result.vessels.map(v=>{
+    const item=node('article','','card');
+    item.append(node('strong',v.name),node('p',v.declaration+' · '+v.captain),
+      node('p',v.days_remaining+' días restantes · '+displayDate(v.expiry_date)));
+    return item;
+  }));
+  if(!result.vessels.length)$('#expiring-results').append(node('p','No hay vencimientos en los próximos 30 días.','muted'));
+}
+$('#search-form').onsubmit=e=>{e.preventDefault();busy(e.target,searchRecords);};
+$('#clear-search').onclick=()=>{$('#search-form').reset();searchRecords().catch(e=>message(e.message,true));};
+$('#export-csv').onclick=()=>{window.location.href='/api/test/export.csv?'+searchParams();};
