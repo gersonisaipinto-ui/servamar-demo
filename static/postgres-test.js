@@ -34,6 +34,7 @@ async function refresh() {
     return card;
   }));
   if(!data.vessels.length) $('#rows').append(node('p','No hay embarcaciones ficticias. Agrega la primera.'));
+  await Promise.all([searchRecords(),loadExpiring()]);
 }
 function showEditor(v=null) {
   editing=v; $('#vessel-form').reset(); $('#editor-title').textContent=v?'Editar embarcación':'Agregar embarcación';
@@ -153,4 +154,3 @@ async function loadExpiring(){
 $('#search-form').onsubmit=e=>{e.preventDefault();busy(e.target,searchRecords);};
 $('#clear-search').onclick=()=>{$('#search-form').reset();searchRecords().catch(e=>message(e.message,true));};
 $('#export-csv').onclick=()=>{window.location.href='/api/test/export.csv?'+searchParams();};
-Promise.all([searchRecords(),loadExpiring()]).catch(e=>message(e.message,true));

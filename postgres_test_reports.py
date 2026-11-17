@@ -1,10 +1,14 @@
 """V92: read-only search, expiry overview and CSV export for fictional vessels."""
 import csv
 import io
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 from flask import Response, jsonify, request
 
 ALLOWED_SEARCH = ('name', 'captain', 'declaration', 'registration_number')
+def today_guatemala():
+    return datetime.now(ZoneInfo('America/Guatemala')).date()
+
 def register(app, protected, connection, ApiError):
     def filters():
         q = request.args.get('q', '').strip()
@@ -15,6 +19,8 @@ def register(app, protected, connection, ApiError):
             import re
             if not re.fullmatch(r'\d{4}-(0[1-9]|1[0-2])', month):
                 raise ApiError('Mes inválido; utiliza yyyy-mm')
+            if not 1 <= int(month[:4]) <= 9998:
+                raise ApiError('Año fuera de rango: utiliza 0001 a 9998')
         return q, month
 
     def search(db, q, month):
@@ -46,11 +52,11 @@ def register(app, protected, connection, ApiError):
     @app.get('/api/test/expiring')
     @protected
     def expiring():
-        today = date.today()
+        today = today_guatemala()
         with connection() as db:
             rows = db.execute(
                 "SELECT id,declaration,name,captain,expiry_date FROM servamar_test.vessels "
-                "WHERE declaration ~ '^ST-(DEMO|TEST)-' AND expiry_date >= %s "
+                "WHERE declaration ~ '^ST-(DEMO|TEST)-' AND stage IN ('ingreso','ampliacion','deposito') AND expiry_date >= %s "
                 "AND expiry_date <= %s ORDER BY expiry_date,id LIMIT 1000",
                 (today, today+timedelta(days=30))).fetchall()
         return jsonify(today=today.isoformat(), vessels=[

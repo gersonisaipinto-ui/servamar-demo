@@ -4,7 +4,7 @@ on:
     branches: [main]
   push:
     branches: [main, feature/v90-postgres-vessels]
-    paths: ['postgres_test_app.py', 'postgres_test_migrate.py', 'templates/postgres_test.html', 'static/postgres-test.*', 'tests/test_v90*', 'tests/test_v89*', 'migrations/v90*', '.github/workflows/v90-postgres-test.yml']
+    paths: ['postgres_test_*.py', 'tests/test_v92*', 'postgres_test_app.py', 'postgres_test_migrate.py', 'templates/postgres_test.html', 'static/postgres-test.*', 'tests/test_v90*', 'tests/test_v89*', 'migrations/v90*', '.github/workflows/v90-postgres-test.yml']
   workflow_dispatch:
 permissions:
   contents: read

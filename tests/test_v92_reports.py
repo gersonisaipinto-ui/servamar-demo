@@ -16,7 +16,7 @@ class SearchTests(unittest.TestCase):
         self.headers={'Authorization':'Basic '+auth,'X-Forwarded-Proto':'https'}
 
     def test_invalid_month_and_long_query(self):
-        for query in ('month=2026-13','month=2026-1','month=invalid','q='+('a'*121)):
+        for query in ('month=2026-13','month=2026-1','month=invalid','month=0000-01','month=9999-12','q='+('a'*121)):
             self.assertEqual(self.client.get('/api/test/search?'+query,headers=self.headers).status_code,400)
             self.assertEqual(self.client.get('/api/test/export.csv?'+query,headers=self.headers).status_code,400)
 
@@ -33,7 +33,7 @@ class SearchTests(unittest.TestCase):
             def __exit__(self,*args):return False
             def execute(self,sql,params):
                 assert 'LIMIT 1000' in sql
-                assert 'ST-(DEMO|TEST)-' in params
+                assert '^ST-(DEMO|TEST)-' in params
                 return Cursor()
         with patch.object(target,'connection',return_value=DB()):
             result=self.client.get('/api/test/export.csv',headers=self.headers)
