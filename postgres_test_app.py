@@ -1,4 +1,4 @@
-"""SERVAMAR V90: independent fictional PostgreSQL console. Never imports app.py."""
+"""SERVAMAR V93: independent fictional PostgreSQL console. Never imports app.py."""
 import hashlib
 import hmac
 import os
@@ -11,11 +11,11 @@ from flask import Flask, Response, jsonify, render_template, request
 from werkzeug.exceptions import HTTPException
 
 app = Flask(__name__, static_folder=None)
-app.config['MAX_CONTENT_LENGTH'] = 32 * 1024
+app.config['MAX_CONTENT_LENGTH'] = 3 * 1024 * 1024
 TEST_BRANCH = 'br-green-band-arsmtoxc'
 TEST_HOST = 'ep-spring-sunset-arxamsuy.c-4.us-west-2.aws.neon.tech'
 KINDS = ('ingreso', 'ampliacion', 'deposito', 'salida', 'retorno', 'cierre')
-FIELDS = ('id', 'declaration', 'name', 'captain', 'stage', 'start_date', 'expiry_date', 'version')
+FIELDS = ('id', 'declaration', 'name', 'captain', 'stage', 'start_date', 'expiry_date', 'version', 'registration_number')
 SELECT_VESSEL = 'SELECT ' + ','.join(FIELDS) + ' FROM servamar_test.vessels'
 
 
@@ -67,6 +67,8 @@ def protected(fn):
                 return jsonify(error='Recarga la página antes de guardar'), 403
             if not request.is_json:
                 return jsonify(error='Se requiere un objeto JSON'), 415
+        if request.endpoint != 'upload_document' and (request.content_length or 0) > 32 * 1024:
+            return jsonify(error='Solicitud demasiado grande'), 413
         try:
             return fn(*args, **kwargs)
         except ApiError as exc:
@@ -150,7 +152,8 @@ def vessel_data(data):
     start, expiry = parse_date(data.get('start_date')), parse_date(data.get('expiry_date'))
     if start and expiry and expiry < start:
         raise ApiError('Vencimiento anterior al ingreso')
-    return declaration, name, captain, start, expiry
+    registration = text_field(data, 'registration_number', 100, required=False)
+    return declaration, name, captain, start, expiry, registration
 
 
 def as_vessel(row):
@@ -191,7 +194,7 @@ def security_headers(response):
 
 @app.get('/healthz')
 def health():
-    return jsonify(service='servamar-postgres-test', version='V92', configured=configured())
+    return jsonify(service='servamar-postgres-test', version='V93', calculations_enabled=False, notifications_enabled=False, configured=configured())
 
 
 @app.get('/')
@@ -213,7 +216,7 @@ def asset_file(asset):
 @protected
 def vessels():
     with connection() as db:
-        rows = db.execute(SELECT_VESSEL + ' ORDER BY expiry_date NULLS LAST,id').fetchall()
+        rows = db.execute(SELECT_VESSEL + " WHERE declaration ~ '^ST-(DEMO|TEST)-' ORDER BY expiry_date NULLS LAST,id").fetchall()
     return jsonify(vessels=[as_vessel(row) for row in rows])
 
 
@@ -222,8 +225,8 @@ def vessels():
 def add_vessel():
     values = vessel_data(payload())
     with connection() as db:
-        row = db.execute("INSERT INTO servamar_test.vessels(declaration,name,captain,stage,start_date,expiry_date,validated,notes) "
-                         "VALUES (%s,%s,%s,'ingreso',%s,%s,FALSE,'DATOS FICTICIOS: PRUEBA GRATUITA') RETURNING id", values).fetchone()
+        row = db.execute("INSERT INTO servamar_test.vessels(declaration,name,captain,stage,start_date,expiry_date,registration_number,validated,notes) "
+                         "VALUES (%s,%s,%s,'ingreso',%s,%s,%s,FALSE,'DATOS FICTICIOS: PRUEBA GRATUITA') RETURNING id", values).fetchone()
         vessel = get_vessel(db, row[0])
         audit(db, row[0], 'create', None, vessel)
     return jsonify(id=row[0], created=True, vessel=vessel), 201
@@ -255,7 +258,7 @@ def edit_vessel(vessel_id):
             earliest = db.execute('SELECT min(event_date) FROM servamar_test.history WHERE vessel_id=%s', (vessel_id,)).fetchone()[0]
             if earliest and values[3] > earliest:
                 raise ApiError('El ingreso no puede ser posterior al historial de movimientos')
-        db.execute('UPDATE servamar_test.vessels SET declaration=%s,name=%s,captain=%s,start_date=%s,expiry_date=%s,version=version+1 WHERE id=%s', (*values, vessel_id))
+        db.execute('UPDATE servamar_test.vessels SET declaration=%s,name=%s,captain=%s,start_date=%s,expiry_date=%s,registration_number=%s,version=version+1 WHERE id=%s', (*values, vessel_id))
         vessel = get_vessel(db, vessel_id)
         audit(db, vessel_id, 'edit', before, vessel)
     return jsonify(vessel=vessel, updated=True)
@@ -330,10 +333,19 @@ def add_movement(vessel_id):
 
 
 from postgres_test_contacts import register as register_contacts
-register_contacts(app, protected, lambda: connection(), get_vessel, check_version, audit, payload, text_field, ApiError)
+register_contacts(app, protected, lambda: connection(), get_vessel, check_version, lambda *args: audit(*args), payload, text_field, ApiError)
 
 from postgres_test_reports import register as register_reports
 register_reports(app, protected, lambda: connection(), ApiError)
+
+from postgres_test_movements import register as register_movements
+register_movements(app, protected, lambda: connection(), get_vessel, check_version,
+                   lambda *args: audit(*args), payload, text_field, parse_date, KINDS, ApiError)
+from postgres_test_documents import register as register_documents
+register_documents(app, protected, lambda: connection(), get_vessel, check_version,
+                   lambda *args: audit(*args), payload, text_field, ApiError)
+from postgres_test_notifications import register as register_notifications
+register_notifications(app, protected, lambda: connection(), get_vessel, ApiError)
 
 if __name__ == '__main__':
     if not configured():

@@ -1,4 +1,4 @@
-"""Explicit V90 migration. Only accepts the pinned TEST branch's direct URL."""
+"""Explicit V93 migration. Only accepts the pinned TEST branch's direct URL."""
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -12,8 +12,9 @@ def migrate():
     if urlsplit(os.environ['SERVAMAR_PG_TEST_DATABASE_URL']).hostname != TEST_HOST:
         raise RuntimeError('Migration requires the direct TEST endpoint')
     with connection() as db:
-        db.execute(Path(__file__).with_name('migrations').joinpath('v90_test_console.sql').read_text(encoding='utf-8'))
-    print('V90 test schema migration complete')
+        for name in ('v90_test_console.sql', 'v91_test_foundation.sql', 'v93_functional_test.sql'):
+            db.execute(Path(__file__).with_name('migrations').joinpath(name).read_text(encoding='utf-8'))
+    print('V93 test schema migration complete')
 
 
 if __name__ == '__main__':

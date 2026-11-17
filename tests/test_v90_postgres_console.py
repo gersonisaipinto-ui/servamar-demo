@@ -102,7 +102,7 @@ class ConsoleTests(unittest.TestCase):
 FIXTURE = """
 CREATE TABLE {s}.vessels (
     id bigint PRIMARY KEY, declaration text NOT NULL UNIQUE, name text NOT NULL,
-    captain text NOT NULL DEFAULT '', stage text NOT NULL, start_date date, expiry_date date,
+    captain text NOT NULL DEFAULT '', registration_number text NOT NULL DEFAULT '', stage text NOT NULL, start_date date, expiry_date date,
     validated boolean NOT NULL DEFAULT false, notes text NOT NULL DEFAULT '');
 CREATE TABLE {s}.history (
     id bigint PRIMARY KEY, vessel_id bigint NOT NULL REFERENCES {s}.vessels(id) ON DELETE RESTRICT,

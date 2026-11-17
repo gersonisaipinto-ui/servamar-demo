@@ -32,7 +32,7 @@ class SearchTests(unittest.TestCase):
             def __enter__(self):return self
             def __exit__(self,*args):return False
             def execute(self,sql,params):
-                assert 'LIMIT 1000' in sql
+                assert 'LIMIT 1001' in sql
                 assert '^ST-(DEMO|TEST)-' in params
                 return Cursor()
         with patch.object(target,'connection',return_value=DB()):

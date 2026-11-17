@@ -3,21 +3,24 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="csrf-token" content="{{ csrf }}">
-  <title>SERVAMAR V92 · Pruebas</title>
+  <title>SERVAMAR V93 · Pruebas</title>
   <link rel="stylesheet" href="/test-assets/postgres-test.css">
   <script src="/test-assets/postgres-test.js" defer></script>
 </head>
 <body><main>
-  <header><p class="eyebrow">SERVAMAR <span>V92 · PRUEBAS</span></p><h1>Embarcaciones</h1>
+  <header><p class="eyebrow">SERVAMAR <span>V93 · PRUEBAS</span></p><h1>Embarcaciones</h1>
   <p>Administra registros ficticios y consulta sus movimientos.</p></header>
   <aside class="notice"><strong>Solo datos ficticios.</strong> Este entorno está separado de la aplicación original. Los movimientos no calculan vencimientos ni envían notificaciones.</aside>
   <p id="message" role="status" aria-live="polite"></p>
   <section aria-labelledby="search-title"><h2 id="search-title">Buscar y reportar</h2>
     <form id="search-form"><div class="grid">
-      <label>Embarcación, capitán o matrícula<input name="q" maxlength="120" placeholder="Buscar registros ficticios"></label>
-      <label>Mes de vencimiento<input name="month" type="month"></label>
+      <label>Embarcación, capitán, matrícula o registro<input name="q" maxlength="120" placeholder="Buscar registros ficticios"></label>
+      <label>Mes del período<input name="month" type="month"></label>
+      <label>Buscar por fecha de<select name="date_field"><option value="expiry_date">Vencimiento manual</option><option value="start_date">Ingreso</option></select></label>
+      <label>Desde<input name="from" placeholder="dd/mm/yyyy" maxlength="10" pattern="[0-9]{2}/[0-9]{2}/[0-9]{4}"></label>
+      <label>Hasta<input name="to" placeholder="dd/mm/yyyy" maxlength="10" pattern="[0-9]{2}/[0-9]{2}/[0-9]{4}"></label>
     </div><button type="submit">Buscar</button><button id="clear-search" type="button" class="secondary">Limpiar</button>
-    <button id="export-csv" type="button" class="secondary">Exportar CSV</button></form>
+    <button id="export-csv" type="button" class="secondary">Exportar CSV</button><button id="export-xlsx" type="button" class="secondary">Excel</button><button id="export-pdf" type="button" class="secondary">PDF</button></form>
     <p id="search-count" aria-live="polite"></p><div id="search-results" class="cards"></div>
     <h3>Próximos 30 días</h3><div id="expiring-results" class="cards"></div>
   </section>
@@ -29,6 +32,7 @@
     <form id="vessel-form"><div class="grid">
       <label>Matrícula ficticia<input name="declaration" placeholder="ST-TEST-005" maxlength="48" pattern="ST-(DEMO|TEST)-[A-Za-z0-9-]{1,40}" required></label>
       <label>Embarcación<input name="name" maxlength="200" required></label>
+      <label>Número de registro<input name="registration_number" maxlength="100" placeholder="Registro ficticio"></label>
       <label>Capitán ficticio<input name="captain" maxlength="200" required></label>
       <label>Fecha de ingreso<input name="start_date" placeholder="dd/mm/yyyy" pattern="[0-9]{2}/[0-9]{2}/[0-9]{4}" maxlength="10"></label>
       <label>Vencimiento manual<input name="expiry_date" placeholder="dd/mm/yyyy" pattern="[0-9]{2}/[0-9]{2}/[0-9]{4}" maxlength="10"></label>
@@ -37,7 +41,7 @@
   </section>
   <section id="detail" hidden aria-labelledby="detail-title">
     <div class="section-heading"><h2 id="detail-title" tabindex="-1">Historial de movimientos</h2><button id="close-detail" type="button" class="secondary">Cerrar</button></div>
-    <p id="detail-name"></p><div id="movements"></div>
+    <p id="detail-name"></p><p id="last-movement" class="hint"></p><div id="movements"></div>
     <h3>Contactos de prueba</h3><div id="contacts"></div>
     <form id="contact-form"><div class="grid">
       <label>Relación<select name="contact_role"><option value="captain">Capitán</option><option value="owner">Propietario</option><option value="representative">Representante</option><option value="other">Otro</option></select></label>
@@ -45,15 +49,29 @@
       <label>Correo<input name="email" type="email" maxlength="254"></label>
       <label>Teléfono<input name="phone" maxlength="60"></label>
       <label><input name="is_primary" type="checkbox"> Contacto principal</label>
-    </div><button type="submit">Agregar contacto ficticio</button></form>
-    <h3>Registrar movimiento ficticio</h3>
-    <p class="hint">Queda en el historial sin modificar la etapa ni el vencimiento de la embarcación. Revisa los datos antes de guardar: el historial se conserva.</p>
+    </div><button id="contact-submit" type="submit">Guardar contacto ficticio</button><button id="contact-cancel" type="button" class="secondary">Cancelar edición</button></form>
+    <h3 id="movement-heading">Registrar movimiento ficticio</h3>
+    <p class="hint">Queda en el historial sin modificar la etapa ni el vencimiento de la embarcación. Puedes editar o eliminar movimientos; la auditoría conserva la información anterior. Los cálculos de permisos siguen pendientes de confirmar.</p>
     <form id="movement-form"><div class="grid">
       <label>Tipo<select name="kind"><option value="ingreso">Ingreso</option><option value="ampliacion">Ampliación</option><option value="deposito">Depósito</option><option value="salida">Salida</option><option value="retorno">Retorno</option><option value="cierre">Cierre</option></select></label>
       <label>Fecha del movimiento<input name="event_date" placeholder="dd/mm/yyyy" pattern="[0-9]{2}/[0-9]{2}/[0-9]{4}" maxlength="10" required></label>
       <label>Vencimiento de referencia (opcional)<input name="expiry_date" placeholder="dd/mm/yyyy" pattern="[0-9]{2}/[0-9]{2}/[0-9]{4}" maxlength="10"></label>
       <label class="wide">Descripción<textarea name="description" maxlength="2000" rows="3" placeholder="Solo información ficticia"></textarea></label>
-    </div><button type="submit">Guardar movimiento</button></form>
+    </div><button type="submit">Guardar movimiento</button><button id="cancel-movement" type="button" class="secondary">Cancelar edición</button></form>
+  </section>
+  <section id="document-section" hidden aria-labelledby="documents-title"><h2 id="documents-title">Documentos del expediente</h2>
+    <p class="hint">PDF, JPG o PNG de hasta 2 MB. Solo archivos ficticios. Archivar conserva el documento y permite restaurarlo.</p>
+    <div id="documents"></div>
+    <form id="document-form"><div class="grid">
+      <label>Tipo<select name="document_type"><option value="permiso_ingreso">Permiso de ingreso</option><option value="ampliacion">Ampliación</option><option value="deposito">Depósito</option><option value="salida">Salida</option><option value="retorno">Retorno</option><option value="otro">Otro</option></select></label>
+      <label>Archivo ficticio<input name="document" type="file" accept=".pdf,.png,.jpg,.jpeg" required></label>
+      <label class="wide"><input name="fictional_confirmed" type="checkbox" required> Confirmo que el documento contiene exclusivamente datos ficticios.</label>
+    </div><button type="submit">Guardar documento</button></form>
+  </section>
+  <section id="notification-section" hidden aria-labelledby="notifications-title"><h2 id="notifications-title">Vista previa de recordatorio</h2>
+    <p class="notice">No se envían correos ni notificaciones. El vencimiento es manual; los cálculos definitivos están pendientes de confirmar.</p>
+    <button id="preview-notification" type="button">Preparar vista previa</button>
+    <p id="notification-subject"></p><pre id="notification-body"></pre><p id="notification-reminders" class="hint"></p>
   </section>
   <dialog id="delete-dialog" aria-labelledby="delete-title"><h2 id="delete-title">Eliminar embarcación ficticia</h2>
     <p id="delete-explanation"></p><form id="delete-form"><label>Escribe la matrícula exacta<input name="confirmation" autocomplete="off" required></label>
