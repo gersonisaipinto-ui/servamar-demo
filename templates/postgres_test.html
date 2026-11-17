@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf }}">
+  <title>SERVAMAR V90 · Pruebas</title>
+  <link rel="stylesheet" href="/test-assets/postgres-test.css">
+  <script src="/test-assets/postgres-test.js" defer></script>
+</head>
+<body><main>
+  <header><p class="eyebrow">SERVAMAR <span>V90 · PRUEBAS</span></p><h1>Embarcaciones</h1>
+  <p>Administra registros ficticios y consulta sus movimientos.</p></header>
+  <aside class="notice"><strong>Solo datos ficticios.</strong> Este entorno está separado de la aplicación original. Los movimientos no calculan vencimientos ni envían notificaciones.</aside>
+  <p id="message" role="status" aria-live="polite"></p>
+  <section aria-labelledby="list-title"><div class="section-heading"><h2 id="list-title">Registros de prueba</h2><div><button id="refresh" type="button" class="secondary">Actualizar</button><button id="new-vessel" type="button">Agregar embarcación</button></div></div>
+    <div id="rows" class="cards" aria-live="polite"><p>Cargando registros…</p></div>
+  </section>
+  <section id="editor" hidden aria-labelledby="editor-title">
+    <h2 id="editor-title" tabindex="-1">Agregar embarcación</h2>
+    <form id="vessel-form"><div class="grid">
+      <label>Matrícula ficticia<input name="declaration" placeholder="ST-TEST-005" maxlength="48" pattern="ST-(DEMO|TEST)-[A-Za-z0-9-]{1,40}" required></label>
+      <label>Embarcación<input name="name" maxlength="200" required></label>
+      <label>Capitán ficticio<input name="captain" maxlength="200" required></label>
+      <label>Fecha de ingreso<input name="start_date" placeholder="dd/mm/yyyy" pattern="[0-9]{2}/[0-9]{2}/[0-9]{4}" maxlength="10"></label>
+      <label>Vencimiento manual<input name="expiry_date" placeholder="dd/mm/yyyy" pattern="[0-9]{2}/[0-9]{2}/[0-9]{4}" maxlength="10"></label>
+    </div><p class="hint">Fechas en dd/mm/yyyy. El vencimiento es opcional y se registra manualmente.</p>
+    <button type="submit">Guardar embarcación</button><button id="cancel-edit" type="button" class="secondary">Cancelar</button></form>
+  </section>
+  <section id="detail" hidden aria-labelledby="detail-title">
+    <div class="section-heading"><h2 id="detail-title" tabindex="-1">Historial de movimientos</h2><button id="close-detail" type="button" class="secondary">Cerrar</button></div>
+    <p id="detail-name"></p><div id="movements"></div>
+    <h3>Registrar movimiento ficticio</h3>
+    <p class="hint">Queda en el historial sin modificar la etapa ni el vencimiento de la embarcación. Revisa los datos antes de guardar: el historial se conserva.</p>
+    <form id="movement-form"><div class="grid">
+      <label>Tipo<select name="kind"><option value="ingreso">Ingreso</option><option value="ampliacion">Ampliación</option><option value="deposito">Depósito</option><option value="salida">Salida</option><option value="retorno">Retorno</option><option value="cierre">Cierre</option></select></label>
+      <label>Fecha del movimiento<input name="event_date" placeholder="dd/mm/yyyy" pattern="[0-9]{2}/[0-9]{2}/[0-9]{4}" maxlength="10" required></label>
+      <label>Vencimiento de referencia (opcional)<input name="expiry_date" placeholder="dd/mm/yyyy" pattern="[0-9]{2}/[0-9]{2}/[0-9]{4}" maxlength="10"></label>
+      <label class="wide">Descripción<textarea name="description" maxlength="2000" rows="3" placeholder="Solo información ficticia"></textarea></label>
+    </div><button type="submit">Guardar movimiento</button></form>
+  </section>
+  <dialog id="delete-dialog" aria-labelledby="delete-title"><h2 id="delete-title">Eliminar embarcación ficticia</h2>
+    <p id="delete-explanation"></p><form id="delete-form"><label>Escribe la matrícula exacta<input name="confirmation" autocomplete="off" required></label>
+    <p id="delete-error" role="alert"></p><div class="actions"><button id="confirm-delete" type="submit" class="danger">Eliminar definitivamente</button><button id="cancel-delete" type="button" class="secondary">Cancelar</button></div></form>
+  </dialog>
+</main></body></html>

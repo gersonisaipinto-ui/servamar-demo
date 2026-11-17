@@ -1,0 +1,100 @@
+'use strict';
+const $ = selector => document.querySelector(selector);
+let editing = null, selected = null, deleting = null;
+const labels = {ingreso:'Ingreso', ampliacion:'Ampliación', deposito:'Depósito', salida:'Salida', retorno:'Retorno', cierre:'Cierre'};
+const displayDate = value => value ? value.slice(0, 10).split('-').reverse().join('/') : '';
+function message(text, error=false) { $('#message').textContent=text; $('#message').classList.toggle('error',error); }
+function node(tag, text, className) { const n=document.createElement(tag); n.textContent=text; if(className)n.className=className; return n; }
+async function api(path, method='GET', body) {
+  const headers={'Accept':'application/json'};
+  if(body!==undefined) { headers['Content-Type']='application/json'; headers['X-CSRF-Token']=$('meta[name="csrf-token"]').content; }
+  const response=await fetch(path,{method,headers,body:body===undefined?undefined:JSON.stringify(body),credentials:'same-origin',cache:'no-store'});
+  let result; try { result=await response.json(); } catch { throw new Error('No se pudo leer la respuesta. Recarga la página e inicia sesión.'); }
+  if(!response.ok) throw new Error(result.error || 'No se pudo completar la operación');
+  return result;
+}
+async function busy(element, task) {
+  const buttons=element.matches('button')?[element]:[...element.querySelectorAll('button')];
+  buttons.forEach(b=>b.disabled=true);
+  try { await task(); } catch(error) { message(error.message,true); }
+  finally { buttons.forEach(b=>b.disabled=false); }
+}
+function action(text, task, style='secondary') {
+  const button=node('button',text,style);button.type='button';
+  button.onclick=()=>busy(button,task); return button;
+}
+async function refresh() {
+  const data=await api('/api/test/vessels');
+  $('#rows').replaceChildren(...data.vessels.map(v=>{
+    const card=node('article','', 'card');
+    card.append(node('p',v.declaration,'registration'),node('h3',v.name),node('p','Capitán: '+v.captain),
+      node('p','Etapa: '+(labels[v.stage]||v.stage)),node('p','Ingreso: '+(displayDate(v.start_date)||'Sin fecha')),
+      node('p','Vencimiento: '+(displayDate(v.expiry_date)||'Sin fecha')),
+      action('Editar',()=>openEdit(v.id)), action('Movimientos',()=>openHistory(v.id)),action('Eliminar',()=>openDelete(v.id)));
+    return card;
+  }));
+  if(!data.vessels.length) $('#rows').append(node('p','No hay embarcaciones ficticias. Agrega la primera.'));
+}
+function showEditor(v=null) {
+  editing=v; $('#vessel-form').reset(); $('#editor-title').textContent=v?'Editar embarcación':'Agregar embarcación';
+  if(v) for(const key of ['declaration','name','captain','start_date','expiry_date']) $('#vessel-form').elements[key].value=key.endsWith('_date')?displayDate(v[key]):v[key];
+  $('#editor').hidden=false; $('#detail').hidden=true; selected=null; $('#editor-title').focus();
+}
+async function openEdit(id) { const data=await api('/api/test/vessels/'+id); showEditor(data.vessel); }
+async function openHistory(id) {
+  const [detail,history]=await Promise.all([api('/api/test/vessels/'+id),api('/api/test/vessels/'+id+'/movements')]);
+  selected=detail.vessel; editing=null; $('#editor').hidden=true; $('#detail').hidden=false;
+  $('#detail-name').textContent=selected.declaration+' · '+selected.name;
+  $('#movements').replaceChildren(...history.movements.map(m=>{
+    const item=node('article','','movement');
+    item.append(node('strong',(labels[m.kind]||m.kind)+' · '+(displayDate(m.event_date)||'Sin fecha')));
+    if(m.expiry_date)item.append(node('p','Vencimiento de referencia: '+displayDate(m.expiry_date)));
+    if(m.description)item.append(node('p',m.description)); return item;
+  }));
+  if(!history.movements.length) $('#movements').append(node('p','Todavía no hay movimientos registrados.','muted'));
+  $('#movement-form').reset(); $('#detail-title').focus();
+}
+async function openDelete(id) {
+  const data=await api('/api/test/vessels/'+id); deleting=data.vessel;
+  $('#delete-form').reset(); $('#delete-error').textContent='';
+  const blocked=data.dependencies.movements+data.dependencies.alerts>0;
+  $('#delete-explanation').textContent=blocked
+    ? 'No se puede eliminar '+deleting.declaration+': tiene '+data.dependencies.movements+' movimientos y '+data.dependencies.alerts+' alertas vinculadas. Se conservarán todos los registros.'
+    : 'Se eliminará '+deleting.declaration+' · '+deleting.name+'. La acción conserva un registro de auditoría.';
+  $('#confirm-delete').disabled=blocked; $('#delete-form').elements.confirmation.disabled=blocked;
+  $('#delete-dialog').showModal();
+}
+$('#new-vessel').onclick=()=>showEditor();
+$('#refresh').onclick=event=>busy(event.target,refresh);
+$('#cancel-edit').onclick=()=>{ $('#editor').hidden=true; editing=null; };
+$('#close-detail').onclick=()=>{ $('#detail').hidden=true; selected=null; };
+$('#cancel-delete').onclick=()=>$('#delete-dialog').close();
+$('#vessel-form').onsubmit=event=>{
+  event.preventDefault(); const form=event.target;
+  busy(form,async()=>{
+    const data=Object.fromEntries(new FormData(form)); const current=editing;
+    if(current)data.version=current.version;
+    await api('/api/test/vessels'+(current?'/'+current.id:''),current?'PUT':'POST',data);
+    $('#editor').hidden=true; editing=null; message(current?'Cambios guardados.':'Embarcación ficticia agregada.'); await refresh();
+  });
+};
+$('#movement-form').onsubmit=event=>{
+  event.preventDefault(); const form=event.target; const current=selected;
+  if(!current)return;
+  busy(form,async()=>{
+    const data=Object.fromEntries(new FormData(form)); data.version=current.version;
+    await api('/api/test/vessels/'+current.id+'/movements','POST',data);
+    message('Movimiento guardado en el historial.'); await openHistory(current.id); await refresh();
+  });
+};
+$('#delete-form').onsubmit=async event=>{
+  event.preventDefault(); const form=event.target; if(!deleting)return;
+  $('#confirm-delete').disabled=true;
+  try {
+    await api('/api/test/vessels/'+deleting.id,'DELETE',{version:deleting.version,confirm_declaration:form.elements.confirmation.value});
+    $('#delete-dialog').close(); $('#editor').hidden=true; $('#detail').hidden=true; editing=null; selected=null;
+    message('Embarcación ficticia eliminada.'); await refresh();
+  } catch(error) { $('#delete-error').textContent=error.message; }
+  finally { $('#confirm-delete').disabled=false; }
+};
+refresh().catch(error=>message(error.message,true));
