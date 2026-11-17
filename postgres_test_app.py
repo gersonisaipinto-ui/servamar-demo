@@ -237,7 +237,10 @@ def vessel_detail(vessel_id):
         counts = db.execute('SELECT (SELECT count(*) FROM servamar_test.history WHERE vessel_id=%s),'
                             '(SELECT count(*) FROM servamar_test.alert_settings WHERE vessel_id=%s)',
                             (vessel_id, vessel_id)).fetchone()
-    return jsonify(vessel=vessel, dependencies=dict(movements=counts[0], alerts=counts[1], contacts=db.execute('SELECT count(*) FROM servamar_test.v91_vessel_contacts WHERE vessel_id=%s', (vessel_id,)).fetchone()[0], documents=db.execute('SELECT count(*) FROM servamar_test.v91_documents WHERE vessel_id=%s', (vessel_id,)).fetchone()[0], notifications=db.execute('SELECT count(*) FROM servamar_test.v91_notification_events WHERE vessel_id=%s', (vessel_id,)).fetchone()[0]))
+        contacts_count = db.execute('SELECT count(*) FROM servamar_test.v91_vessel_contacts WHERE vessel_id=%s', (vessel_id,)).fetchone()[0]
+        documents_count = db.execute('SELECT count(*) FROM servamar_test.v91_documents WHERE vessel_id=%s', (vessel_id,)).fetchone()[0]
+        notifications_count = db.execute('SELECT count(*) FROM servamar_test.v91_notification_events WHERE vessel_id=%s', (vessel_id,)).fetchone()[0]
+    return jsonify(vessel=vessel, dependencies=dict(movements=counts[0], alerts=counts[1], contacts=contacts_count, documents=documents_count, notifications=notifications_count))
 
 
 @app.put('/api/test/vessels/<int:vessel_id>')
