@@ -168,6 +168,9 @@ class CalculatedDatabaseTests(support.FunctionalTests):
     def test_search_export_and_notifications_share_effective_expiry(self):
         vessel=self.create(start_date='04/11/2026',expiry_date='',calculation_mode='calculated',name='Calc-'+__import__('uuid').uuid4().hex)
         self.assertEqual(vessel['expiry_date'],'2027-02-02')
+        initial=self.request('GET',self.path(vessel)+'/notifications/preview').json
+        self.assertEqual([r['days_before'] for r in initial['reminders']],[30,15,1])
+        self.assertEqual(initial['reminders'][0]['date'],'2027-01-03')
         vessel,_=self.add(vessel,'ampliacion','10/11/2026')
         self.assertEqual(vessel['expiry_date'],'2027-11-02')
         query='q='+vessel['name']
@@ -176,8 +179,8 @@ class CalculatedDatabaseTests(support.FunctionalTests):
         self.assertIn('02/11/2027',self.request('GET','/api/test/export.csv?'+query).text)
         preview=self.request('GET',self.path(vessel)+'/notifications/preview')
         self.assertEqual(preview.status_code,200,preview.json);self.assertFalse(preview.json['manual_dates']);self.assertFalse(preview.json['delivery_enabled'])
-        self.assertEqual([r['days_before'] for r in preview.json['reminders']],[30,15,1])
-        self.assertEqual(preview.json['reminders'][0]['date'],'2027-10-03')
+        self.assertEqual(preview.json['reminders'],[])
+        self.assertTrue(preview.json['automatic']['suspended'])
 
     def test_daily_closure_is_reflected_in_reads_without_background_jobs(self):
         vessel=self.create(start_date='01/08/2026',calculation_mode='calculated',expiry_date='',name='Daily-'+__import__('uuid').uuid4().hex)

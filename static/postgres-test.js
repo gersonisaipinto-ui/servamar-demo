@@ -51,6 +51,9 @@ async function openHistory(id) {
   if(requestId!==detailRequest)return;
   selected=detail.vessel; editing=null; $('#editor').hidden=true; $('#detail').hidden=false;
   $('#detail-name').textContent=selected.declaration+' · '+selected.name;
+  $('#automatic-notification-status').textContent=selected.automatic_notices_suspended
+    ? 'Correos y notificaciones automáticos desactivados por '+(labels[selected.automatic_notices_reason]||'movimiento registrado')+'. No se reactivan al editar o eliminar movimientos.'
+    : 'Envíos automáticos deshabilitados en el entorno de pruebas.';
   $('#permit-summary').textContent=(selected.plazo||'Vencimiento manual: '+displayDate(selected.expiry_date))+(selected.days_added?' · '+selected.days_added+' días añadidos por retornos':'');
   $('#movement-help').textContent=selected.calculation_mode==='calculated'?'Cada cambio recalcula el historial completo. Retorno hasta el día 90 inclusive; cierre desde el día 91.':'Este expediente conserva fecha manual. Cambia el modo al editar la embarcación para aplicar el cálculo.';
   $('#movement-form').elements.expiry_date.disabled=selected.calculation_mode==='calculated';
