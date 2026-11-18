@@ -41,6 +41,17 @@ def intercept(route):
     elif path=='/api/test/vessels/1':result=dict(vessel=vessel,dependencies=dict(movements=len(movements),alerts=0,contacts=0,documents=0,notifications=0))
     elif '/notifications/plan' in path:result=dict(expiry_date=vessel['expiry_date'],plans=plans,capped=True,delivery_enabled=False)
     elif '/notifications/preview' in path:result=dict(subject='PRUEBA',body='Hello, Test\nHola, Prueba',warning='Sin envíos',reminders=[])
+    elif path.endswith('/movements/preview'):
+        import postgres_test_permits as permits
+        history=[dict(m) for m in movements if m['id']!=data.get('movement_id')]
+        event=data.get('event_date') or '17/11/2026'
+        if '/' in event:event='-'.join(reversed(event.split('/')))
+        history.append(dict(id=data.get('movement_id',99),kind=data['kind'],event_date=event))
+        try:
+            projected=permits.calculate(vessel['start_date'],history,date(2026,11,18))
+            result=dict(projection=dict(projected,explanation='Cálculo de prueba'),effective_event_date=event,mode_will_change=False,delivery_enabled=False)
+        except permits.PermitError as exc:
+            status=409;result=dict(error=str(exc))
     elif path.endswith('/movements') and method=='GET':result=dict(movements=movements)
     elif '/movements/' in path and method=='PUT':
         for key in ('event_date','expiry_date'):
@@ -128,11 +139,13 @@ try:
         entry=page.locator('#vessel-form [name=start_date]')
         entry.fill('29022024')
         expect(entry).to_have_value('29/02/2024')
+        expect(page.locator('#initial-expiry')).to_have_value('29/05/2024')
         expect(page.get_by_label('Calendario: Fecha de ingreso',exact=True)).to_have_value('2024-02-29')
         entry.fill('31022026')
         assert not entry.evaluate('(el)=>el.checkValidity()'), 'Impossible dates must be rejected'
         entry.fill('2026-11-18')
         expect(entry).to_have_value('18/11/2026')
+        expect(page.locator('#initial-expiry')).to_have_value('16/02/2027')
         entry.press('End');entry.press('Backspace')
         expect(entry).to_have_value('18/11/202')
         entry.press_sequentially('6')
@@ -164,6 +177,7 @@ try:
         expect(page.locator('#movements')).to_contain_text('Descripción editada ficticia')
         page.get_by_role('button',name='Editar movimiento',exact=True).click()
         page.locator('#movement-form [name=kind]').select_option('ampliacion')
+        expect(page.locator('#movement-calculated-expiry')).to_have_value('02/11/2027')
         page.get_by_role('button',name='Guardar movimiento',exact=True).click()
         expect(page.locator('#last-movement')).to_contain_text('Ampliación')
         expect(page.get_by_role('button',name='Guardar movimiento',exact=True)).to_be_enabled()

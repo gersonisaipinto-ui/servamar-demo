@@ -195,4 +195,84 @@ class CalculatedDatabaseTests(support.FunctionalTests):
             self.assertEqual(search.json['vessels'][0]['stage'],'cierre')
             self.assertEqual(self.request('GET',self.path(vessel)+'/notifications/preview').status_code,409)
 
+    def test_manual_extension_preview_and_save_are_atomic(self):
+        vessel=self.create(start_date='04/11/2026',expiry_date='04/02/2027')
+        path=self.path(vessel)+'/movements'
+        body=dict(version=vessel['version'],kind='ampliacion',event_date='',apply_calculation=True)
+        before=self.request('GET',self.path(vessel)+'/notifications/plan').json
+        preview=self.request('POST',path+'/preview',body)
+        self.assertEqual(preview.status_code,200,preview.json)
+        self.assertEqual(preview.json['projection']['expiry_date'],'2027-11-02')
+        self.assertIn('02/02/2027 + 9 meses calendario = 02/11/2027',preview.json['projection']['explanation'])
+        self.assertEqual(preview.json['effective_event_date'],'2026-11-17')
+        self.assertTrue(preview.json['mode_will_change'])
+        self.assertFalse(preview.json['delivery_enabled'])
+        self.assertEqual(self.request('GET',self.path(vessel)).json['vessel'],vessel)
+        self.assertEqual(self.request('GET',path).json['movements'],[])
+        self.assertEqual(self.request('GET',self.path(vessel)+'/notifications/plan').json,before)
+        response=self.request('POST',path,body)
+        self.assertEqual(response.status_code,201,response.json)
+        saved=response.json['vessel'];self.assertTrue(response.json['projection_applied'])
+        self.assertEqual(saved['expiry_date'],preview.json['projection']['expiry_date'])
+        self.assertEqual(saved['stage'],'ampliacion');self.assertEqual(saved['calculation_mode'],'calculated')
+        self.assertEqual(saved['version'],vessel['version']+1)
+        self.assertEqual(self.request('GET',path).json['movements'][0]['event_date'],'2026-11-17')
+        plans=self.request('GET',self.path(vessel)+'/notifications/plan').json['plans']
+        self.assertEqual(len([p for p in plans if p['status']=='planned']),9)
+        self.assertTrue(all(p['status']=='cancelled' for p in plans if p['expiry_date']==vessel['expiry_date']))
+        self.assertEqual({p['date'] for p in plans if p['status']=='planned'},{'2027-10-03','2027-10-18','2027-11-01'})
+        self.assertEqual(self.request('POST',path,dict(body,version=saved['version'])).status_code,409)
+        self.assertEqual(len(self.request('GET',path).json['movements']),1)
+        with self.fixture_connection() as db:
+            change=db.execute("SELECT after_state FROM servamar_test.v90_audit WHERE vessel_id=%s AND action='movement'",(vessel['id'],)).fetchone()[0]
+            self.assertTrue(change['calculation_mode_changed'])
+            self.assertEqual(db.execute('SELECT count(*) FROM servamar_test.v91_notification_events WHERE vessel_id=%s',(vessel['id'],)).fetchone()[0],0)
+
+    def test_extension_conversion_rolls_back_on_audit_failure(self):
+        vessel=self.create(start_date='04/11/2026')
+        path=self.path(vessel)+'/movements'
+        before=self.request('GET',self.path(vessel)+'/notifications/plan').json
+        with patch('postgres_test_app.audit',side_effect=RuntimeError('fictional audit failure')):
+            response=self.request('POST',path,dict(version=vessel['version'],kind='ampliacion',apply_calculation=True))
+        self.assertEqual(response.status_code,503,response.json)
+        self.assertEqual(self.request('GET',self.path(vessel)).json['vessel'],vessel)
+        self.assertEqual(self.request('GET',path).json['movements'],[])
+        self.assertEqual(self.request('GET',self.path(vessel)+'/notifications/plan').json,before)
+
+    def test_edit_manual_extension_can_apply_calculation_and_undo(self):
+        vessel=self.create(start_date='04/11/2026',expiry_date='')
+        vessel,mid=self.add(vessel,'ampliacion','10/11/2026')
+        self.assertIsNone(vessel['expiry_date'])
+        path=self.path(vessel)+'/movements'
+        body=dict(version=vessel['version'],movement_id=mid,kind='ampliacion',event_date='11/11/2026',apply_calculation=True)
+        preview=self.request('POST',path+'/preview',body)
+        self.assertEqual(preview.status_code,200,preview.json)
+        response=self.request('PUT',path+'/'+str(mid),body)
+        self.assertEqual(response.status_code,200,response.json);vessel=response.json['vessel']
+        self.assertEqual(vessel['expiry_date'],preview.json['projection']['expiry_date'])
+        self.assertEqual(len(self.request('GET',path).json['movements']),1)
+        self.assertEqual(vessel['calculation_mode'],'calculated')
+        response=self.request('DELETE',path+'/'+str(mid),dict(version=vessel['version'],confirm_declaration=vessel['declaration']))
+        self.assertEqual(response.status_code,200,response.json)
+        self.assertEqual(response.json['vessel']['expiry_date'],'2027-02-02')
+        self.assertEqual(response.json['vessel']['stage'],'ingreso')
+
+    def test_preview_invalid_history_ownership_version_and_options(self):
+        vessel=self.create(start_date='04/11/2026')
+        path=self.path(vessel)+'/movements'
+        body=dict(version=vessel['version'],kind='ampliacion',event_date='18/11/2026',apply_calculation=True)
+        for suffix in ('/preview',''):
+            self.assertEqual(self.request('POST',path+suffix,body).status_code,409)
+            self.assertEqual(self.request('POST',path+suffix,dict(body,apply_calculation='true')).status_code,400)
+            self.assertEqual(self.request('POST',path+suffix,dict(body,event_date='10/11/2026',version=100)).status_code,409)
+        self.assertEqual(self.request('POST',path+'/preview',dict(body,movement_id=True)).status_code,400)
+        self.assertEqual(self.request('POST',path+'/preview',dict(body,movement_id=999999)).status_code,404)
+        self.assertEqual(self.request('GET',self.path(vessel)).json['vessel'],vessel)
+        vessel,_=self.add(vessel,'ampliacion','12/12/2026')
+        # Preserve historical rows for correction; never silently discard or re-date them.
+        response=self.request('POST',path+'/preview',dict(body,version=vessel['version'],event_date='10/11/2026'))
+        self.assertEqual(response.status_code,409,response.json)
+        self.assertEqual(self.request('GET',self.path(vessel)).json['vessel'],vessel)
+
+
 if __name__=='__main__':unittest.main()
