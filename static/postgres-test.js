@@ -1,11 +1,12 @@
 'use strict';
 const $ = selector => document.querySelector(selector);
 let editing = null, selected = null, deleting = null, editingMovement = null, editingContact = null;
-let detailRequest = 0, searchRequest = 0, searchSubmitted = false;
+let detailRequest = 0, searchRequest = 0, searchSubmitted = false, reportRequest = 0, reportSubmitted = false;
+let currentView='inicio', returnView='inicio';
 const labels = {ingreso:'Ingreso', ampliacion:'Ampliación', deposito:'Depósito', salida:'Salida', retorno:'Retorno', cierre:'Cierre'};
 const displayDate = value => value ? value.slice(0, 10).split('-').reverse().join('/') : '';
 function message(text, error=false) { $('#message').textContent=text; $('#message').classList.toggle('error',error); }
-function node(tag, text, className) { const n=document.createElement(tag); n.textContent=text; if(className)n.className=className; return n; }
+function node(tag, text='', className) { const n=document.createElement(tag); n.textContent=text; if(className)n.className=className; return n; }
 async function api(path, method='GET', body) {
   const headers={'Accept':'application/json'};
   if(body!==undefined) { headers['Content-Type']='application/json'; headers['X-CSRF-Token']=$('meta[name="csrf-token"]').content; }
@@ -24,32 +25,59 @@ function action(text, task, style='secondary') {
   const button=node('button',text,style);button.type='button';
   button.onclick=()=>busy(button,task); return button;
 }
+function showView(view, focus=false){
+  const panel=document.getElementById('tab-'+view);if(!panel)return;
+  for(const item of document.querySelectorAll('.view-panel'))item.hidden=item!==panel;
+  for(const button of document.querySelectorAll('.tabs [data-view]')){
+    const active=button.dataset.view===(view==='expediente'?returnView:view);
+    button.classList.toggle('active',active);
+    if(active)button.setAttribute('aria-current','page');else button.removeAttribute('aria-current');
+  }
+  currentView=view;
+  if(focus){const heading=panel.querySelector('h2');if(heading){heading.tabIndex=-1;heading.focus();}}
+}
+function renderVessels(target,vessels,mode='list',empty='No hay embarcaciones para estos filtros.'){
+  const compact=mode==='upcoming'||mode==='notices';
+  target.replaceChildren(...vessels.map(v=>{
+    const row=node('tr');
+    function cell(label,content){const td=node('td');td.dataset.label=label;td.append(content);row.append(td);return td;}
+    const name=node('div');name.append(node('strong',v.name));if(compact)name.append(node('small',v.declaration));
+    cell('Embarcación',name);
+    if(!compact){cell('Número ST',v.declaration);cell('Registro',v.registration_number||'—');}
+    cell('Capitán',v.captain||'Sin registrar');
+    if(!compact){cell('Etapa',node('span',labels[v.stage]||v.stage,'badge '+(labels[v.stage]?v.stage:'')));cell('Ingreso',displayDate(v.start_date)||'Sin fecha');}
+    cell('Plazo',v.plazo||('Vence: '+(displayDate(v.expiry_date)||'Sin fecha')));
+    const actions=node('div','','row-actions');
+    if(mode==='list')actions.append(action('Editar',()=>openEdit(v.id)),action('Movimientos',()=>openHistory(v.id)),action('Eliminar',()=>openDelete(v.id),'danger'));
+    else actions.append(action(mode==='notices'?'Ver avisos':'Ver expediente',()=>openHistory(v.id,mode==='notices')));
+    cell('Acciones',actions);return row;
+  }));
+  if(!vessels.length){const row=node('tr'),td=node('td',empty,'muted');td.colSpan=compact?4:8;row.append(td);target.append(row);}
+}
 async function refresh() {
   const data=await api('/api/test/vessels');
-  $('#rows').replaceChildren(...data.vessels.map(v=>{
-    const card=node('article','', 'card');
-    card.append(node('p',v.declaration,'registration'),node('h3',v.name),node('p','Capitán: '+v.captain),
-      node('p','Etapa: '+(labels[v.stage]||v.stage)),node('p','Ingreso: '+(displayDate(v.start_date)||'Sin fecha')),
-      node('p',v.plazo||('Vencimiento: '+(displayDate(v.expiry_date)||'Sin fecha'))),
-      action('Editar',()=>openEdit(v.id)), action('Movimientos',()=>openHistory(v.id)),action('Eliminar',()=>openDelete(v.id)));
-    return card;
-  }));
-  if(!data.vessels.length) $('#rows').append(node('p','No hay embarcaciones ficticias. Agrega la primera.'));
+  renderVessels($('#rows'),data.vessels,'list','Todavía no hay embarcaciones ficticias. Registra el primer ingreso.');
+  renderVessels($('#notice-vessels'),data.vessels,'notices','Registra una embarcación para consultar sus avisos.');
   $('#records-count').textContent=' ('+data.vessels.length+')';
-  await Promise.all([searchSubmitted?searchRecords():Promise.resolve(),loadExpiring()]);
+  $('#total-vessels').textContent=data.vessels.length;
+  $('#away-vessels').textContent=data.vessels.filter(v=>v.stage==='salida').length;
+  await Promise.all([searchSubmitted?searchRecords():Promise.resolve(),reportSubmitted?previewReport():Promise.resolve(),loadExpiring()]);
 }
 function showEditor(v=null) {
+  returnView=currentView==='expediente'?returnView:currentView==='nuevo'?'inicio':currentView;
   hideDetail(); editing=v; $('#vessel-form').reset(); $('#editor-title').textContent=v?'Editar embarcación':'Agregar embarcación';
   if(v) for(const key of ['declaration','name','captain','registration_number','start_date','expiry_date']) $('#vessel-form').elements[key].value=key.endsWith('_date')?displayDate(v[key]):v[key];
   $('#vessel-form').elements.calculation_mode.value=v?(v.calculation_mode||'manual'):'calculated';
   syncEditorMode();
-  $('#editor').hidden=false; $('#detail').hidden=true; selected=null; $('#editor-title').focus();
+  $('#editor').hidden=false; $('#detail').hidden=true; selected=null;showView('nuevo');$('#editor-title').focus();
 }
 async function openEdit(id) { const data=await api('/api/test/vessels/'+id); showEditor(data.vessel); }
-async function openHistory(id) {
+async function openHistory(id, focusNotices=false) {
   const requestId=++detailRequest;
   const [detail,history,contacts,documents,plan]=await Promise.all([api('/api/test/vessels/'+id),api('/api/test/vessels/'+id+'/movements'),api('/api/test/vessels/'+id+'/contacts'),api('/api/test/vessels/'+id+'/documents'),api('/api/test/vessels/'+id+'/notifications/plan')]);
   if(requestId!==detailRequest)return;
+  if(currentView!=='expediente')returnView=currentView;
+  showView('expediente');
   selected=detail.vessel; editing=null; $('#editor').hidden=true; $('#detail').hidden=false;
   $('#detail-name').textContent=selected.declaration+' · '+selected.name;
   renderNotificationPlan(plan);
@@ -109,7 +137,8 @@ async function openHistory(id) {
   if(!contacts.contacts.length)$('#contacts').append(node('p','Sin contactos ficticios.','muted'));
   editingContact=null;editingMovement=null;$('#movement-heading').textContent='Registrar movimiento ficticio';
   $('#contact-form').reset();
-  $('#movement-form').reset(); syncDates($('#movement-form'));$('#detail-title').focus();
+  $('#movement-form').reset(); syncDates($('#movement-form'));
+  (focusNotices?$('#notifications-title'):$('#detail-title')).focus();
 }
 async function openDelete(id) {
   const data=await api('/api/test/vessels/'+id); deleting=data.vessel;
@@ -123,12 +152,12 @@ async function openDelete(id) {
 }
 $('#new-vessel').onclick=()=>showEditor();
 $('#refresh').onclick=event=>busy(event.target,refresh);
-$('#cancel-edit').onclick=()=>{ $('#editor').hidden=true; editing=null; };
+$('#cancel-edit').onclick=()=>{ $('#editor').hidden=true; editing=null;showView(returnView,true); };
 function hideDetail(){
   ++detailRequest;$('#detail').hidden=true;$('#document-section').hidden=true;$('#notification-section').hidden=true;
   selected=null;editingMovement=null;editingContact=null;
 }
-$('#close-detail').onclick=hideDetail;
+$('#close-detail').onclick=()=>{hideDetail();showView(returnView,true);};
 $('#cancel-movement').onclick=()=>{editingMovement=null;$('#movement-form').reset();$('#movement-heading').textContent='Registrar movimiento ficticio';};
 $('#contact-cancel').onclick=()=>{editingContact=null;$('#contact-form').reset();};
 $('#cancel-delete').onclick=()=>$('#delete-dialog').close();
@@ -138,7 +167,7 @@ $('#vessel-form').onsubmit=event=>{
     const data=Object.fromEntries(new FormData(form)); const current=editing;
     if(current)data.version=current.version;
     await api('/api/test/vessels'+(current?'/'+current.id:''),current?'PUT':'POST',data);
-    $('#editor').hidden=true; editing=null; message(current?'Cambios guardados.':'Embarcación ficticia agregada.'); await refresh();
+    $('#editor').hidden=true; editing=null;showView(returnView,true); message(current?'Cambios guardados.':'Embarcación ficticia agregada.'); await refresh();
   });
 };
 $('#movement-form').onsubmit=event=>{
@@ -172,8 +201,8 @@ $('#contact-form').onsubmit=event=>{
   });
 };
 
-function searchParams() {
-  const data=new FormData($('#search-form'));
+function searchParams(form=$('#search-form')) {
+  const data=new FormData(form);
   const params=new URLSearchParams();
   for(const key of ['q','month','date_field','stage','from','to'])if(data.get(key))params.set(key,data.get(key));
   return params.toString();
@@ -183,25 +212,27 @@ async function searchRecords(){
   const result=await api('/api/test/search?'+searchParams());
   if(requestId!==searchRequest)return;
   $('#search-count').textContent=result.count+' resultados'+(result.capped?' (límite de 1000)':'');
-  $('#search-results').replaceChildren(...result.vessels.map(v=>{
-    const item=node('article','','card');
-    item.append(node('strong',v.name),node('p',v.declaration+' · '+v.captain),
-      node('p',v.plazo||('Vence: '+(displayDate(v.expiry_date)||'Sin fecha'))),
-      action('Abrir historial',()=>openHistory(v.id)));
-    return item;
-  }));
+  renderVessels($('#search-results'),result.vessels,'search');
 }
 async function loadExpiring(){
   const result=await api('/api/test/expiring');
-  $('#expiring-results').replaceChildren(...result.vessels.map(v=>{
-    const item=node('article','','card');
-    item.append(node('strong',v.name),node('p',v.declaration+' · '+v.captain),
-      node('p',v.plazo||(v.days_remaining+' días restantes · '+displayDate(v.expiry_date))),
-      action('Ver expediente',()=>openHistory(v.id)));
-    return item;
-  }));
-  if(!result.vessels.length)$('#expiring-results').append(node('p','No hay vencimientos en los próximos 30 días.','muted'));
+  renderVessels($('#expiring-results'),result.vessels,'upcoming','No hay vencimientos en los próximos 30 días.');
+  $('#due-vessels').textContent=result.vessels.length+(result.capped?'+':'');
 }
+async function previewReport(){
+  const requestId=++reportRequest;
+  const result=await api('/api/test/search?'+searchParams($('#report-form')));
+  if(requestId!==reportRequest)return;
+  $('#report-count').textContent=result.count+' embarcaciones'+(result.capped?' (límite de 1000; reduce el período antes de descargar)':'');
+  renderVessels($('#report-results'),result.vessels,'report');
+}
+$('#report-form').onsubmit=e=>{e.preventDefault();reportSubmitted=true;busy(e.target,previewReport);};
+$('#clear-report').onclick=()=>{$('#report-form').reset();reportSubmitted=false;++reportRequest;$('#report-count').textContent='Selecciona un período para revisar el control antes de descargarlo.';$('#report-results').replaceChildren();};
+$('#search-to-report').onclick=()=>{
+  for(const key of ['q','month','date_field','stage','from','to'])$('#report-form').elements[key].value=$('#search-form').elements[key].value;
+  syncDates($('#report-form'));reportSubmitted=false;++reportRequest;$('#report-results').replaceChildren();
+  $('#report-count').textContent='Filtros copiados desde Buscar. Pulsa Vista previa para revisar el control.';showView('exportar',true);
+};
 $('#search-form').onsubmit=e=>{e.preventDefault();searchSubmitted=true;busy(e.target,searchRecords);};
 $('#clear-search').onclick=()=>{$('#search-form').reset();searchSubmitted=false;++searchRequest;$('#search-count').textContent='Usa los filtros y pulsa Buscar para consultar otros expedientes.';$('#search-results').replaceChildren();};
 async function download(path,filename){
@@ -209,7 +240,7 @@ async function download(path,filename){
   if(!response.ok){let result;try{result=await response.json();}catch{throw new Error('No se pudo descargar el archivo');}throw new Error(result.error||'No se pudo descargar el archivo');}
   const url=URL.createObjectURL(await response.blob());const link=document.createElement('a');link.href=url;link.download=filename;document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
-for(const format of ['csv','xlsx','pdf'])$('#export-'+format).onclick=e=>busy(e.target,()=>download('/api/test/export.'+format+'?'+searchParams(),'servamar-pruebas.'+format));
+for(const format of ['csv','xlsx','pdf'])$('#export-'+format).onclick=e=>busy(e.target,()=>download('/api/test/export.'+format+'?'+searchParams($('#report-form')),'servamar-pruebas.'+format));
 $('#document-form').onsubmit=event=>{
   event.preventDefault();const form=event.target;const current=selected;if(!current)return;
   busy(form,async()=>{
@@ -307,5 +338,9 @@ function enhanceDates(){
   for(const form of document.forms)form.addEventListener('reset',()=>queueMicrotask(()=>syncDates(form)));
   syncDates(document);
 }
+for(const button of document.querySelectorAll('.tabs [data-view]'))button.onclick=()=>{
+  ++detailRequest;
+  if(button.dataset.view==='nuevo'&&$('#editor').hidden)showEditor();else showView(button.dataset.view,true);
+};
 enhanceDates();
 refresh().catch(error=>message(error.message,true));
