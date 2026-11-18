@@ -285,11 +285,12 @@ function enhanceDates(){
   for(const [index,input] of [...document.querySelectorAll('[data-date]')].entries()){
     const label=input.closest('label');const caption=label.textContent.trim();
     input.id=input.id||'date-'+index;label.htmlFor=input.id;
+    const field=document.createElement('div');label.before(field);field.append(label);
     const wrapper=document.createElement('span');wrapper.className='date-control';
     const calendar=document.createElement('input');calendar.type='date';calendar.className='date-calendar';
     calendar.id=input.id+'-calendar';calendar.setAttribute('aria-label','Calendario: '+caption);
     calendar.title='Elegir '+caption.toLowerCase()+' en calendario';
-    input.before(wrapper);wrapper.append(input,calendar);
+    wrapper.append(input,calendar);field.append(wrapper);
     input.addEventListener('input',event=>{
       if(!event.inputType||!event.inputType.startsWith('delete')){
         const raw=input.value,iso=/^\d{4}-\d{2}-\d{2}$/.test(raw);
