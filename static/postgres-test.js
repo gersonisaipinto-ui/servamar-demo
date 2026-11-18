@@ -268,6 +268,7 @@ $('#preview-notification').onclick=event=>{
 function syncEditorMode(){
   const form=$('#vessel-form');const calculated=form.elements.calculation_mode.value==='calculated';
   form.elements.expiry_date.disabled=calculated;form.elements.start_date.required=calculated;
+  form.elements.expiry_date.closest('.date-control').parentElement.hidden=calculated;
   $('#initial-expiry-field').hidden=!calculated;updateInitialExpiry();syncDates(form);
 }
 $('#vessel-form').elements.calculation_mode.onchange=syncEditorMode;
@@ -295,7 +296,8 @@ function queueMovementPreview(){
   const extension=form.elements.kind.value==='ampliacion';
   form.elements.event_date.required=!extension;
   document.querySelector('label[for="'+form.elements.event_date.id+'"]').firstChild.textContent=extension?'Fecha de autorización (opcional)':'Fecha del movimiento';
-  form.elements.expiry_date.disabled=calculated;syncDates(form);
+  form.elements.expiry_date.disabled=calculated;
+  form.elements.expiry_date.closest('.date-control').parentElement.hidden=calculated;syncDates(form);
   $('#movement-calculated-field').hidden=!calculated;
   $('#movement-calculated-expiry').value='';$('#movement-feedback').textContent='';
   if(!calculated){$('#movement-preview').textContent='Solo se guardará una referencia en el historial. La fecha manual del permiso no cambiará.';return;}
