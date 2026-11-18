@@ -33,8 +33,6 @@ def intercept(route):
     elif path.endswith('/movements') and method=='GET':result=dict(movements=movements)
     elif '/movements/' in path and method=='PUT':
         movements[0].update({k:v for k,v in data.items() if k!='version'});vessel['version']+=1;result=dict(vessel=vessel,updated=True)
-        if data.get('kind') in ('ampliacion','deposito'):
-            vessel.update(automatic_notices_suspended=True,automatic_notices_reason=data['kind'])
     elif path.endswith('/contacts') and method=='GET':result=dict(contacts=contacts)
     elif path.endswith('/documents') and method=='GET':result=dict(documents=documents)
     elif path.endswith('/documents') and method=='POST':
@@ -70,7 +68,9 @@ try:
         page.get_by_role('button',name='Editar movimiento',exact=True).click()
         page.locator('#movement-form [name=kind]').select_option('ampliacion')
         page.get_by_role('button',name='Guardar movimiento',exact=True).click()
-        expect(page.locator('#automatic-notification-status')).to_contain_text('desactivados por Ampliación')
+        expect(page.locator('#last-movement')).to_contain_text('Ampliación')
+        expect(page.get_by_role('button',name='Guardar movimiento',exact=True)).to_be_enabled()
+        expect(page.locator('#automatic-notification-status')).to_contain_text('siguen el vencimiento actual: 02/02/2027')
         page.locator('#document-form [name=document]').set_input_files({'name':'ficticio.pdf','mimeType':'application/pdf','buffer':b'%PDF-ficticio'})
         page.locator('#document-form [name=fictional_confirmed]').check()
         page.get_by_role('button',name='Guardar documento',exact=True).click()

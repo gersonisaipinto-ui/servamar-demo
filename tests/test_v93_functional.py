@@ -55,7 +55,7 @@ class FunctionalTests(support.DatabaseTests):
         import psycopg
         if not cls.schema.startswith('v93_ci_'):raise RuntimeError('Unexpected fixture')
         with psycopg.connect(cls.url) as db:
-            for name in ('v93_document_content','v90_audit','v91_notification_events','v91_documents','v91_vessel_contacts','alert_settings','history','vessels'):
+            for name in ('v96_notification_schedule','v93_document_content','v90_audit','v91_notification_events','v91_documents','v91_vessel_contacts','alert_settings','history','vessels'):
                 db.execute('DROP TABLE '+cls.schema+'.'+name)
             for name in ('v90_vessel_id_seq','v90_history_id_seq'):db.execute('DROP SEQUENCE '+cls.schema+'.'+name)
             db.execute('DROP SCHEMA '+cls.schema)
