@@ -1,4 +1,4 @@
-"""SERVAMAR V94: independent fictional PostgreSQL console. Never imports app.py."""
+"""SERVAMAR V95: independent fictional PostgreSQL console. Never imports app.py."""
 import hashlib
 import hmac
 import os
@@ -15,7 +15,7 @@ app.config['MAX_CONTENT_LENGTH'] = 3 * 1024 * 1024
 TEST_BRANCH = 'br-green-band-arsmtoxc'
 TEST_HOST = 'ep-spring-sunset-arxamsuy.c-4.us-west-2.aws.neon.tech'
 KINDS = ('ingreso', 'ampliacion', 'deposito', 'salida', 'retorno', 'cierre')
-FIELDS = ('id', 'declaration', 'name', 'captain', 'stage', 'start_date', 'expiry_date', 'version', 'registration_number', 'calculation_mode')
+FIELDS = ('id', 'declaration', 'name', 'captain', 'stage', 'start_date', 'expiry_date', 'version', 'registration_number', 'calculation_mode', 'automatic_notices_suspended', 'automatic_notices_reason')
 SELECT_VESSEL = 'SELECT ' + ','.join(FIELDS) + ' FROM servamar_test.vessels'
 
 
@@ -199,7 +199,7 @@ def security_headers(response):
 
 @app.get('/healthz')
 def health():
-    return jsonify(service='servamar-postgres-test', version='V94', calculations_enabled=True, notifications_enabled=False, configured=configured())
+    return jsonify(service='servamar-postgres-test', version='V95', calculations_enabled=True, notifications_enabled=False, configured=configured())
 
 
 @app.get('/')
@@ -335,9 +335,11 @@ def add_movement(vessel_id):
                          'VALUES (%s,%s,%s,%s,%s,CURRENT_TIMESTAMP::text) RETURNING id',
                          (vessel_id, kind, event_date, expiry, description)).fetchone()
         recalculate(db, vessel_id)
+        from postgres_test_notifications import suspend_automatic_notices
+        automatic = suspend_automatic_notices(db, vessel_id, kind)
         db.execute('UPDATE servamar_test.vessels SET version=version+1 WHERE id=%s', (vessel_id,))
         audit(db, vessel_id, 'movement', None, dict(id=row[0], kind=kind, event_date=event_date.isoformat(),
-                                                 expiry_date=expiry.isoformat() if expiry else None, description=description))
+                                                 expiry_date=expiry.isoformat() if expiry else None, description=description, automatic_notices=automatic))
         updated = get_vessel(db, vessel_id)
     return jsonify(id=row[0], created=True, vessel=updated), 201
 

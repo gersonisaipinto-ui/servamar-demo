@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="csrf-token" content="{{ csrf }}">
-  <title>SERVAMAR V94 · Pruebas</title>
+  <title>SERVAMAR V95 · Pruebas</title>
   <link rel="stylesheet" href="/test-assets/postgres-test.css">
   <script src="/test-assets/postgres-test.js" defer></script>
 </head>
 <body><main>
-  <header><p class="eyebrow">SERVAMAR <span>V94 · PRUEBAS</span></p><h1>Embarcaciones</h1>
+  <header><p class="eyebrow">SERVAMAR <span>V95 · PRUEBAS</span></p><h1>Embarcaciones</h1>
   <p>Administra registros ficticios y consulta sus movimientos.</p></header>
   <aside class="notice"><strong>Solo datos ficticios.</strong> Este entorno está separado de la aplicación original. Cálculo disponible: 90 días + 9 meses calendario. El retorno hasta el día 90 conserva el permiso. No se envían notificaciones.</aside>
   <p id="message" role="status" aria-live="polite"></p>
@@ -70,9 +70,9 @@
     </div><button type="submit">Guardar documento</button></form>
   </section>
   <section id="notification-section" hidden aria-labelledby="notifications-title"><h2 id="notifications-title">Vista previa de recordatorio</h2>
-    <p class="notice">No se envían correos ni notificaciones. Recordatorios: 30, 15 y 1 días antes del vencimiento. La vista previa identifica si la fecha es manual o calculada.</p>
+    <p class="notice">No se envían correos ni notificaciones. Recordatorios: 30, 15 y 1 días antes del vencimiento. Registrar una ampliación o un depósito desactiva los correos y las notificaciones automáticos de esa embarcación. La vista previa manual sigue disponible.</p>
     <button id="preview-notification" type="button">Preparar vista previa</button>
-    <p id="notification-subject"></p><pre id="notification-body"></pre><p id="notification-reminders" class="hint"></p>
+    <p id="automatic-notification-status" role="status"></p><p id="notification-subject"></p><pre id="notification-body"></pre><p id="notification-reminders" class="hint"></p>
   </section>
   <dialog id="delete-dialog" aria-labelledby="delete-title"><h2 id="delete-title">Eliminar embarcación ficticia</h2>
     <p id="delete-explanation"></p><form id="delete-form"><label>Escribe la matrícula exacta<input name="confirmation" autocomplete="off" required></label>
