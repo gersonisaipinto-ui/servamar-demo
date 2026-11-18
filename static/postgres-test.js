@@ -30,7 +30,7 @@ async function refresh() {
     const card=node('article','', 'card');
     card.append(node('p',v.declaration,'registration'),node('h3',v.name),node('p','Capitán: '+v.captain),
       node('p','Etapa: '+(labels[v.stage]||v.stage)),node('p','Ingreso: '+(displayDate(v.start_date)||'Sin fecha')),
-      node('p','Vencimiento: '+(displayDate(v.expiry_date)||'Sin fecha')),
+      node('p',v.plazo||('Vencimiento: '+(displayDate(v.expiry_date)||'Sin fecha'))),
       action('Editar',()=>openEdit(v.id)), action('Movimientos',()=>openHistory(v.id)),action('Eliminar',()=>openDelete(v.id)));
     return card;
   }));
@@ -40,6 +40,8 @@ async function refresh() {
 function showEditor(v=null) {
   hideDetail(); editing=v; $('#vessel-form').reset(); $('#editor-title').textContent=v?'Editar embarcación':'Agregar embarcación';
   if(v) for(const key of ['declaration','name','captain','registration_number','start_date','expiry_date']) $('#vessel-form').elements[key].value=key.endsWith('_date')?displayDate(v[key]):v[key];
+  $('#vessel-form').elements.calculation_mode.value=v?(v.calculation_mode||'manual'):'calculated';
+  syncEditorMode();
   $('#editor').hidden=false; $('#detail').hidden=true; selected=null; $('#editor-title').focus();
 }
 async function openEdit(id) { const data=await api('/api/test/vessels/'+id); showEditor(data.vessel); }
@@ -49,6 +51,9 @@ async function openHistory(id) {
   if(requestId!==detailRequest)return;
   selected=detail.vessel; editing=null; $('#editor').hidden=true; $('#detail').hidden=false;
   $('#detail-name').textContent=selected.declaration+' · '+selected.name;
+  $('#permit-summary').textContent=(selected.plazo||'Vencimiento manual: '+displayDate(selected.expiry_date))+(selected.days_added?' · '+selected.days_added+' días añadidos por retornos':'');
+  $('#movement-help').textContent=selected.calculation_mode==='calculated'?'Cada cambio recalcula el historial completo. Retorno hasta el día 90 inclusive; cierre desde el día 91.':'Este expediente conserva fecha manual. Cambia el modo al editar la embarcación para aplicar el cálculo.';
+  $('#movement-form').elements.expiry_date.disabled=selected.calculation_mode==='calculated';
   const last=history.movements.at(-1);
   $('#last-movement').textContent=last?'Último movimiento: '+(labels[last.kind]||last.kind)+' el '+displayDate(last.event_date):'Sin movimientos.';
   $('#document-section').hidden=false;$('#notification-section').hidden=false;
@@ -177,7 +182,7 @@ async function searchRecords(){
   $('#search-results').replaceChildren(...result.vessels.map(v=>{
     const item=node('article','','card');
     item.append(node('strong',v.name),node('p',v.declaration+' · '+v.captain),
-      node('p','Vence: '+(displayDate(v.expiry_date)||'Sin fecha')),
+      node('p',v.plazo||('Vence: '+(displayDate(v.expiry_date)||'Sin fecha'))),
       action('Abrir historial',()=>openHistory(v.id)));
     return item;
   }));
@@ -187,7 +192,7 @@ async function loadExpiring(){
   $('#expiring-results').replaceChildren(...result.vessels.map(v=>{
     const item=node('article','','card');
     item.append(node('strong',v.name),node('p',v.declaration+' · '+v.captain),
-      node('p',v.days_remaining+' días restantes · '+displayDate(v.expiry_date)));
+      node('p',v.plazo||(v.days_remaining+' días restantes · '+displayDate(v.expiry_date))));
     return item;
   }));
   if(!result.vessels.length)$('#expiring-results').append(node('p','No hay vencimientos en los próximos 30 días.','muted'));
@@ -219,3 +224,9 @@ $('#preview-notification').onclick=event=>{
     $('#notification-reminders').textContent=result.warning+' '+result.reminders.map(r=>r.days_before+' días: '+displayDate(r.date)).join(' · ');
   });
 };
+
+function syncEditorMode(){
+  const form=$('#vessel-form');const calculated=form.elements.calculation_mode.value==='calculated';
+  form.elements.expiry_date.disabled=calculated;form.elements.start_date.required=calculated;
+}
+$('#vessel-form').elements.calculation_mode.onchange=syncEditorMode;

@@ -1,10 +1,10 @@
-"""Editable fictional history. Permit projection deliberately remains disabled."""
+"""Editable fictional history. Calculated records replay atomically after each correction."""
 from datetime import date
 from flask import jsonify
 
 
 def register(app, protected, connection, get_vessel, check_version, audit, payload,
-             text_field, parse_date, kinds, ApiError):
+             text_field, parse_date, kinds, ApiError, recalculate):
     def record(db, vessel_id, movement_id):
         row = db.execute('SELECT id,kind,event_date,expiry_date,description FROM servamar_test.history '
                          'WHERE vessel_id=%s AND id=%s FOR UPDATE', (vessel_id, movement_id)).fetchone()
@@ -33,11 +33,12 @@ def register(app, protected, connection, get_vessel, check_version, audit, paylo
                 raise ApiError('Movimiento anterior al ingreso')
             db.execute('UPDATE servamar_test.history SET kind=%s,event_date=%s,expiry_date=%s,description=%s '
                        'WHERE vessel_id=%s AND id=%s', (kind,event,expiry,description,vessel_id,movement_id))
+            recalculate(db, vessel_id)
             db.execute('UPDATE servamar_test.vessels SET version=version+1 WHERE id=%s', (vessel_id,))
             after = record(db, vessel_id, movement_id)
             audit(db, vessel_id, 'movement_edit', before, after)
             vessel = get_vessel(db, vessel_id)
-        return jsonify(updated=True, movement=after, vessel=vessel, projection_applied=False)
+        return jsonify(updated=True, movement=after, vessel=vessel, projection_applied=vessel.get('calculation_mode') == 'calculated')
 
     @app.delete('/api/test/vessels/<int:vessel_id>/movements/<int:movement_id>')
     @protected
@@ -50,7 +51,8 @@ def register(app, protected, connection, get_vessel, check_version, audit, paylo
                 raise ApiError('Confirma la matrícula ficticia para eliminar el movimiento')
             before = record(db, vessel_id, movement_id)
             db.execute('DELETE FROM servamar_test.history WHERE vessel_id=%s AND id=%s', (vessel_id,movement_id))
+            recalculate(db, vessel_id)
             db.execute('UPDATE servamar_test.vessels SET version=version+1 WHERE id=%s', (vessel_id,))
             audit(db, vessel_id, 'movement_delete', before, None)
             vessel = get_vessel(db, vessel_id)
-        return jsonify(deleted=True, vessel=vessel, projection_applied=False)
+        return jsonify(deleted=True, vessel=vessel, projection_applied=vessel.get('calculation_mode') == 'calculated')

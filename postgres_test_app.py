@@ -1,4 +1,4 @@
-"""SERVAMAR V93: independent fictional PostgreSQL console. Never imports app.py."""
+"""SERVAMAR V94: independent fictional PostgreSQL console. Never imports app.py."""
 import hashlib
 import hmac
 import os
@@ -15,7 +15,7 @@ app.config['MAX_CONTENT_LENGTH'] = 3 * 1024 * 1024
 TEST_BRANCH = 'br-green-band-arsmtoxc'
 TEST_HOST = 'ep-spring-sunset-arxamsuy.c-4.us-west-2.aws.neon.tech'
 KINDS = ('ingreso', 'ampliacion', 'deposito', 'salida', 'retorno', 'cierre')
-FIELDS = ('id', 'declaration', 'name', 'captain', 'stage', 'start_date', 'expiry_date', 'version', 'registration_number')
+FIELDS = ('id', 'declaration', 'name', 'captain', 'stage', 'start_date', 'expiry_date', 'version', 'registration_number', 'calculation_mode')
 SELECT_VESSEL = 'SELECT ' + ','.join(FIELDS) + ' FROM servamar_test.vessels'
 
 
@@ -149,11 +149,15 @@ def vessel_data(data):
     ensure_test_declaration(declaration)
     name = text_field(data, 'name', 200)
     captain = text_field(data, 'captain', 200)
-    start, expiry = parse_date(data.get('start_date')), parse_date(data.get('expiry_date'))
+    mode = data.get('calculation_mode', 'manual')
+    if mode not in ('manual', 'calculated'):
+        raise ApiError('Modo de cálculo inválido')
+    start = parse_date(data.get('start_date'))
+    expiry = parse_date(data.get('expiry_date')) if mode == 'manual' else None
     if start and expiry and expiry < start:
         raise ApiError('Vencimiento anterior al ingreso')
     registration = text_field(data, 'registration_number', 100, required=False)
-    return declaration, name, captain, start, expiry, registration
+    return declaration, name, captain, start, expiry, registration, mode
 
 
 def as_vessel(row):
@@ -165,7 +169,8 @@ def get_vessel(db, vessel_id, lock=False):
     if not row:
         raise ApiError('Embarcación inexistente', 404)
     ensure_test_declaration(row[1])
-    return as_vessel(row)
+    from postgres_test_permits import decorate_many
+    return decorate_many(db, [as_vessel(row)])[0]
 
 
 def check_version(data, vessel):
@@ -194,7 +199,7 @@ def security_headers(response):
 
 @app.get('/healthz')
 def health():
-    return jsonify(service='servamar-postgres-test', version='V93', calculations_enabled=False, notifications_enabled=False, configured=configured())
+    return jsonify(service='servamar-postgres-test', version='V94', calculations_enabled=True, notifications_enabled=False, configured=configured())
 
 
 @app.get('/')
@@ -217,7 +222,9 @@ def asset_file(asset):
 def vessels():
     with connection() as db:
         rows = db.execute(SELECT_VESSEL + " WHERE declaration ~ '^ST-(DEMO|TEST)-' ORDER BY expiry_date NULLS LAST,id").fetchall()
-    return jsonify(vessels=[as_vessel(row) for row in rows])
+        from postgres_test_permits import decorate_many
+        result = decorate_many(db, [as_vessel(row) for row in rows])
+    return jsonify(vessels=result)
 
 
 @app.post('/api/test/vessels')
@@ -225,8 +232,9 @@ def vessels():
 def add_vessel():
     values = vessel_data(payload())
     with connection() as db:
-        row = db.execute("INSERT INTO servamar_test.vessels(declaration,name,captain,stage,start_date,expiry_date,registration_number,validated,notes) "
-                         "VALUES (%s,%s,%s,'ingreso',%s,%s,%s,FALSE,'DATOS FICTICIOS: PRUEBA GRATUITA') RETURNING id", values).fetchone()
+        row = db.execute("INSERT INTO servamar_test.vessels(declaration,name,captain,stage,start_date,expiry_date,registration_number,calculation_mode,validated,notes) "
+                         "VALUES (%s,%s,%s,'ingreso',%s,%s,%s,%s,FALSE,'DATOS FICTICIOS: PRUEBA GRATUITA') RETURNING id", values).fetchone()
+        recalculate(db, row[0])
         vessel = get_vessel(db, row[0])
         audit(db, row[0], 'create', None, vessel)
     return jsonify(id=row[0], created=True, vessel=vessel), 201
@@ -250,15 +258,17 @@ def vessel_detail(vessel_id):
 @protected
 def edit_vessel(vessel_id):
     data = payload()
-    values = vessel_data(data)
     with connection() as db:
         before = get_vessel(db, vessel_id, lock=True)
         check_version(data, before)
+        data.setdefault('calculation_mode', before['calculation_mode'])
+        values = vessel_data(data)
         if values[3]:
             earliest = db.execute('SELECT min(event_date) FROM servamar_test.history WHERE vessel_id=%s', (vessel_id,)).fetchone()[0]
             if earliest and values[3] > earliest:
                 raise ApiError('El ingreso no puede ser posterior al historial de movimientos')
-        db.execute('UPDATE servamar_test.vessels SET declaration=%s,name=%s,captain=%s,start_date=%s,expiry_date=%s,registration_number=%s,version=version+1 WHERE id=%s', (*values, vessel_id))
+        db.execute('UPDATE servamar_test.vessels SET declaration=%s,name=%s,captain=%s,start_date=%s,expiry_date=%s,registration_number=%s,calculation_mode=%s,version=version+1 WHERE id=%s', (*values, vessel_id))
+        recalculate(db, vessel_id)
         vessel = get_vessel(db, vessel_id)
         audit(db, vessel_id, 'edit', before, vessel)
     return jsonify(vessel=vessel, updated=True)
@@ -324,12 +334,17 @@ def add_movement(vessel_id):
         row = db.execute('INSERT INTO servamar_test.history(vessel_id,kind,event_date,expiry_date,description,created_at) '
                          'VALUES (%s,%s,%s,%s,%s,CURRENT_TIMESTAMP::text) RETURNING id',
                          (vessel_id, kind, event_date, expiry, description)).fetchone()
-        # Record events only: no unvalidated permit calculations or stage changes.
+        recalculate(db, vessel_id)
         db.execute('UPDATE servamar_test.vessels SET version=version+1 WHERE id=%s', (vessel_id,))
         audit(db, vessel_id, 'movement', None, dict(id=row[0], kind=kind, event_date=event_date.isoformat(),
                                                  expiry_date=expiry.isoformat() if expiry else None, description=description))
         updated = get_vessel(db, vessel_id)
     return jsonify(id=row[0], created=True, vessel=updated), 201
+
+
+def recalculate(db, vessel_id):
+    from postgres_test_permits import persist
+    persist(db, vessel_id, ApiError)
 
 
 from postgres_test_contacts import register as register_contacts
@@ -340,7 +355,7 @@ register_reports(app, protected, lambda: connection(), ApiError)
 
 from postgres_test_movements import register as register_movements
 register_movements(app, protected, lambda: connection(), get_vessel, check_version,
-                   lambda *args: audit(*args), payload, text_field, parse_date, KINDS, ApiError)
+                   lambda *args: audit(*args), payload, text_field, parse_date, KINDS, ApiError, recalculate)
 from postgres_test_documents import register as register_documents
 register_documents(app, protected, lambda: connection(), get_vessel, check_version,
                    lambda *args: audit(*args), payload, text_field, ApiError)

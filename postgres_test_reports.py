@@ -1,4 +1,4 @@
-"""Search and exports of fictional records; dates remain manually entered."""
+"""Search and exports using manual dates or the confirmed permit projection."""
 import csv
 import io
 import re
@@ -10,7 +10,7 @@ from flask import Response, jsonify, request
 
 LIMIT = 1000
 COLUMNS = ('declaration','name','captain','registration_number','stage','start_date','expiry_date')
-HEADERS = ('Matrícula ficticia','Embarcación','Capitán','Número de registro','Etapa','Ingreso','Vencimiento manual')
+HEADERS = ('Matrícula ficticia','Embarcación','Capitán','Número de registro','Etapa','Ingreso','Vencimiento','Plazo')
 
 
 def today_guatemala():
@@ -32,6 +32,7 @@ def export_rows(rows):
             if key.endswith('_date') and value:
                 value='/'.join(reversed(value.split('-')))
             values.append(safe_cell(value))
+        values.append(safe_cell(row.get('plazo', '')))
         result.append(values)
     return result
 
@@ -84,7 +85,7 @@ def register(app, protected, connection, ApiError):
         return dict(q=q,month=month,field=field,stage=stage,start=start,end=end)
 
     def search(db,criteria):
-        sql=('SELECT id,declaration,name,captain,registration_number,stage,start_date,expiry_date '
+        sql=('SELECT id,declaration,name,captain,registration_number,stage,start_date,expiry_date,calculation_mode '
              'FROM servamar_test.vessels WHERE declaration ~ %s')
         params=['^ST-(DEMO|TEST)-']
         q=criteria['q']
@@ -102,11 +103,13 @@ def register(app, protected, connection, ApiError):
         if criteria['end']:
             sql+=f' AND {field} <= %s';params.append(criteria['end'])
         if criteria['stage']:
-            sql+=' AND stage=%s';params.append(criteria['stage'])
+            sql+=" AND (CASE WHEN calculation_mode='calculated' AND stage='salida' AND (SELECT max(h.event_date) FROM servamar_test.history h WHERE h.vessel_id=servamar_test.vessels.id AND h.kind='salida') < %s THEN 'cierre' ELSE stage END)=%s"
+            params.extend([today_guatemala()-timedelta(days=90),criteria['stage']])
         sql+=' ORDER BY expiry_date NULLS LAST,id LIMIT 1001'
         rows=db.execute(sql,params).fetchall()
-        columns=('id',)+COLUMNS
-        return [dict(zip(columns,(v.isoformat() if isinstance(v,date) else v for v in row))) for row in rows]
+        columns=('id',)+COLUMNS+('calculation_mode',)
+        from postgres_test_permits import decorate_many
+        return decorate_many(db,[dict(zip(columns,(v.isoformat() if isinstance(v,date) else v for v in row))) for row in rows])
 
     @app.get('/api/test/search')
     @protected
@@ -120,13 +123,15 @@ def register(app, protected, connection, ApiError):
     def expiring():
         today=today_guatemala()
         with connection() as db:
-            rows=db.execute("SELECT id,declaration,name,captain,expiry_date FROM servamar_test.vessels "
+            rows=db.execute("SELECT id,declaration,name,captain,expiry_date,stage,start_date,calculation_mode FROM servamar_test.vessels "
                             "WHERE declaration ~ '^ST-(DEMO|TEST)-' AND stage IN ('ingreso','ampliacion','deposito') "
                             "AND expiry_date >= %s AND expiry_date <= %s ORDER BY expiry_date,id LIMIT 1001",
                             (today,today+timedelta(days=30))).fetchall()
-        return jsonify(today=today.isoformat(),manual_dates=True,capped=len(rows)>LIMIT,vessels=[
-            dict(id=r[0],declaration=r[1],name=r[2],captain=r[3],expiry_date=r[4].isoformat(),days_remaining=(r[4]-today).days)
-            for r in rows[:LIMIT]])
+            from postgres_test_permits import decorate_many
+            result=decorate_many(db,[dict(id=r[0],declaration=r[1],name=r[2],captain=r[3],expiry_date=r[4].isoformat(),
+                                          stage=r[5],start_date=r[6].isoformat() if r[6] else None,calculation_mode=r[7],days_remaining=(r[4]-today).days)
+                                     for r in rows[:LIMIT]])
+        return jsonify(today=today.isoformat(),capped=len(rows)>LIMIT,vessels=[v for v in result if not v.get('needs_review')])
 
     def export_data():
         criteria=filters()
@@ -157,7 +162,7 @@ def register(app, protected, connection, ApiError):
         rows=export_data();output=io.BytesIO();styles=getSampleStyleSheet()
         style=styles['BodyText'];style.fontSize=8;style.leading=10
         table=Table([[Paragraph(escape(str(value)),style) for value in row] for row in rows],
-                    colWidths=[105,135,125,90,70,85,115],repeatRows=1)
+                    colWidths=[85,100,95,75,60,75,75,135],repeatRows=1)
         table.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,0),colors.HexColor('#d8eaed')),
                                    ('VALIGN',(0,0),(-1,-1),'TOP'),('GRID',(0,0),(-1,-1),.3,colors.HexColor('#b7cbd3')),
                                    ('TOPPADDING',(0,0),(-1,-1),6),('BOTTOMPADDING',(0,0),(-1,-1),6)]))
@@ -165,5 +170,5 @@ def register(app, protected, connection, ApiError):
         def footer(canvas,doc):
             canvas.setFont('Helvetica',8);canvas.drawString(20,12,'SERVAMAR · DATOS FICTICIOS · Página '+str(doc.page))
         document.build([Paragraph('SERVAMAR · Reporte de pruebas',styles['Title']),
-                        Paragraph(f'{len(rows)-1} registros. Fechas manuales; cálculos automáticos pendientes de confirmación. Generado {today_guatemala():%d/%m/%Y}.',style),Spacer(1,12),table],onFirstPage=footer,onLaterPages=footer)
+                        Paragraph(f'{len(rows)-1} registros. Regla de cálculo: 90 días + 9 meses; los registros manuales se identifican en Plazo. Generado {today_guatemala():%d/%m/%Y}.',style),Spacer(1,12),table],onFirstPage=footer,onLaterPages=footer)
         return Response(output.getvalue(),mimetype='application/pdf',headers={'Content-Disposition':'attachment; filename="servamar-pruebas.pdf"'})
