@@ -5,6 +5,7 @@ import json
 import os
 import sys
 import threading
+import re
 from datetime import date, timedelta
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
@@ -19,7 +20,8 @@ vessel=dict(id=1,declaration='ST-TEST-BROWSER',name='Velero ficticio',captain='C
             registration_number='REG-TEST',version=1,stage='ingreso',calculation_mode='calculated',
             start_date='2026-11-04',expiry_date='2027-02-02',days_remaining=30)
 movements=[dict(id=1,kind='salida',event_date='2026-11-17',expiry_date=None,description='Ficticio')]
-contacts=[];documents=[];requests=[];queries=[]
+contacts=[];documents=[];requests=[];queries=[];export_queries=[]
+artifacts=Path("artifacts/ui");artifacts.mkdir(parents=True,exist_ok=True)
 def plans_for(expiry,status='planned'):
     return [dict(expiry_date=expiry,days_before=d,date=(date.fromisoformat(expiry)-timedelta(days=d)).isoformat(),channel=c,status=status)
             for d in (30,15,1) for c in ('email','push','windows')]
@@ -55,6 +57,7 @@ def intercept(route):
     elif path.endswith('/documents') and method=='POST':
         vessel['version']+=1;documents.append(dict(id=1,filename=data['filename'],document_type=data['document_type'],archived_at=None,size_bytes=100));result=dict(vessel=vessel,created=True,id=1);status=201
     elif path.startswith('/api/test/export.'):
+        export_queries.append(parse_qs(urlsplit(request.url).query))
         route.fulfill(status=200,body='FICTICIO',content_type='application/octet-stream');return
     else:raise AssertionError((method,path))
     route.fulfill(status=status,body=json.dumps(result),content_type='application/json')
@@ -65,14 +68,35 @@ try:
     with sync_playwright() as playwright:
         browser=playwright.chromium.launch(executable_path=os.getenv('SERVAMAR_TEST_CHROMIUM'),headless=True,args=['--no-sandbox'])
         context=browser.new_context(http_credentials={'username':'servamar-test','password':'browser-fictional-password'},viewport={'width':390,'height':844},accept_downloads=True)
+        # Visual reference from the original templates/styles, with fictional content.
+        reference=context.new_page()
+        original=target.app.jinja_env.get_template('index.html').render(demo_mode=False)
+        original=re.sub(r'<script\b[^>]*>[\s\S]*?</script>','',original)
+        original=original.replace('<link rel="stylesheet" href="/static/style.css?v=71">','<style>'+Path('static/style.css').read_text()+'</style>')
+        reference.set_content(original)
+        reference.screenshot(path=str(artifacts/'original-mobile.png'),full_page=True)
+        reference.set_viewport_size({'width':1440,'height':1000})
+        reference.screenshot(path=str(artifacts/'original-desktop.png'),full_page=True)
+        reference.close()
         page=context.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
         page.route('**/api/test/**',intercept)
         page.goto('http://127.0.0.1:8793')
         expect(page.locator('#expiring-results')).to_contain_text('Velero ficticio')
         expect(page.locator('#expiring-results')).to_contain_text('Capitán de prueba')
         expect(page.locator('#rows')).to_be_hidden()
-        expect(page.locator('#search-results .card')).to_have_count(0)
+        expect(page.locator('#search-results tr')).to_have_count(0)
         assert not queries, 'Initial screen should only show upcoming deadlines'
+        expect(page.locator('.view-panel:visible')).to_have_count(1)
+        page.screenshot(path=str(artifacts/'v98-home-mobile.png'),full_page=True)
+        assert page.locator('#expiring-results td').first.evaluate('(el)=>getComputedStyle(el).display')=='grid'
+        page.set_viewport_size({'width':1440,'height':1000})
+        assert page.locator('#expiring-results td').first.evaluate('(el)=>getComputedStyle(el).display')=='table-cell'
+        page.screenshot(path=str(artifacts/'v98-home-desktop.png'),full_page=True)
+        page.set_viewport_size({'width':390,'height':844})
+        page.locator('.tabs [data-view=buscar]').click()
+        expect(page.locator('#tab-buscar')).to_be_visible()
+        expect(page.locator('#tab-inicio')).to_be_hidden()
+        expect(page.locator('.tabs [data-view=buscar]')).to_have_attribute('aria-current','page')
         page.locator('#search-form [name=stage]').select_option('ampliacion')
         date_from=page.locator('#search-form [name=from]')
         date_from.press_sequentially('01112026')
@@ -81,13 +105,23 @@ try:
         expect(page.get_by_label('Calendario: Desde',exact=True)).to_have_value('2026-11-01')
         page.get_by_label('Calendario: Hasta',exact=True).fill('2027-11-30')
         expect(page.locator('#search-form [name=to]')).to_have_value('30/11/2027')
-        page.get_by_role('button',name='Buscar',exact=True).click()
+        page.locator('#search-form').get_by_role('button',name='Buscar',exact=True).click()
         expect(page.locator('#search-count')).to_contain_text('1 resultados')
         assert queries[-1]['stage']==['ampliacion'] and queries[-1]['from']==['01/11/2026'] and queries[-1]['to']==['30/11/2027'],queries
+        page.locator('#search-to-report').click()
+        expect(page.locator('#tab-exportar')).to_be_visible()
+        expect(page.locator('#report-form [name=stage]')).to_have_value('ampliacion')
+        expect(page.get_by_label('Calendario: Desde (reporte)',exact=True)).to_have_value('2026-11-01')
+        page.locator('#report-form').get_by_role('button',name='Vista previa',exact=True).click()
+        expect(page.locator('#report-count')).to_contain_text('1 embarcaciones')
+        expect(page.locator('#report-results')).to_contain_text('Velero ficticio')
+        page.locator('.tabs [data-view=buscar]').click()
         page.locator('#clear-search').click()
-        expect(page.locator('#search-results .card')).to_have_count(0)
+        expect(page.locator('#search-results tr')).to_have_count(0)
         expect(page.get_by_label('Calendario: Desde',exact=True)).to_have_value('')
+        page.locator('.tabs [data-view=inicio]').click()
         page.get_by_role('button',name='Agregar embarcación',exact=True).click()
+        expect(page.locator('#tab-nuevo')).to_be_visible()
         expect(page.locator('#vessel-form [name=calculation_mode]')).to_have_value('calculated')
         expect(page.locator('#vessel-form [name=expiry_date]')).to_be_disabled()
         expect(page.get_by_label('Calendario: Vencimiento manual',exact=True)).to_be_disabled()
@@ -109,7 +143,9 @@ try:
         expect(page.locator('#vessel-form [name=expiry_date]')).to_be_enabled()
         expect(page.get_by_label('Calendario: Vencimiento manual',exact=True)).to_be_enabled()
         page.locator('#cancel-edit').click()
-        page.get_by_role('button',name='Ver expediente',exact=True).click()
+        page.locator('#expiring-results').get_by_role('button',name='Ver expediente',exact=True).click()
+        expect(page.locator('#tab-expediente')).to_be_visible()
+        page.screenshot(path=str(artifacts/'v98-expediente-mobile.png'),full_page=True)
         expect(page.locator('#notification-plan .card')).to_have_count(3)
         expect(page.locator('#notification-plan')).to_contain_text('03/01/2027 · 30 días antes')
         expect(page.locator('#notification-plan')).to_contain_text('Correo · Android / push · Windows')
@@ -143,19 +179,36 @@ try:
         expect(page.locator('#documents')).to_contain_text('ficticio.pdf')
         page.get_by_role('button',name='Preparar vista previa',exact=True).click()
         expect(page.locator('#notification-body')).to_contain_text('Hello')
+        page.get_by_role('button',name='Cerrar',exact=True).click()
+        expect(page.locator('#tab-inicio')).to_be_visible()
+        page.locator('.tabs [data-view=avisos]').click()
+        page.locator('#notice-vessels').get_by_role('button',name='Ver avisos',exact=True).click()
+        expect(page.locator('#notification-plan')).to_contain_text('03/10/2027')
+        expect(page.locator('#notifications-title')).to_be_focused()
+        page.get_by_role('button',name='Cerrar',exact=True).click()
+        expect(page.locator('#tab-avisos')).to_be_visible()
+        expect(page.locator('#document-section')).to_be_hidden();expect(page.locator('#notification-section')).to_be_hidden()
+        page.locator('.tabs [data-view=exportar]').click()
         with page.expect_download() as download:
             page.get_by_role('button',name='Excel',exact=True).click()
         assert download.value.suggested_filename=='servamar-pruebas.xlsx'
-        page.get_by_role('button',name='Cerrar',exact=True).click()
-        expect(page.locator('#document-section')).to_be_hidden();expect(page.locator('#notification-section')).to_be_hidden()
+        assert export_queries[-1]['stage']==['ampliacion'] and export_queries[-1]['from']==['01/11/2026'],export_queries
+        page.locator('.tabs [data-view=buscar]').click()
         page.locator('#records-section summary').click()
         expect(page.locator('#rows')).to_be_visible()
         assert page.evaluate('document.documentElement.scrollWidth<=innerWidth'), 'Mobile overflow'
-        page.set_viewport_size({'width':1440,'height':1000})
-        assert page.evaluate('document.documentElement.scrollWidth<=innerWidth'), 'Desktop overflow'
+        for width in (320,390,1440):
+            page.set_viewport_size({'width':width,'height':1000})
+            for view in ('inicio','nuevo','buscar','avisos','exportar'):
+                page.locator('.tabs [data-view='+view+']').click()
+                expect(page.locator('.view-panel:visible')).to_have_count(1)
+                assert page.evaluate('document.documentElement.scrollWidth<=innerWidth'), f'Overflow: {width} {view}'
+                if width in (390,1440):
+                    page.evaluate('scrollTo(0,0)')
+                    page.screenshot(path=str(artifacts/f'v98-{view}-{width}.png'),full_page=True)
         assert not errors,errors
         assert not any('/notifications/send' in path for method,path in requests), 'Browser must never send notices'
         assert ('PUT','/api/test/vessels/1/movements/1') in requests
         browser.close()
-    print('PASS: mobile/desktop, 30-day homepage, explicit search/stage filter, date typing/calendar/reset/validation, current/cancelled/sent/elapsed notice plans, movement edit, document upload, preview, Excel download; no JS errors or sends')
+    print('PASS: original-style navigation, responsive tables/cards (320/390/1440), report preview/filter handoff/export, notice navigation, 30-day homepage, explicit search/stage filter, date typing/calendar/reset/validation, current/cancelled/sent/elapsed notice plans, movement edit, document upload, preview, Excel download; no JS errors or sends')
 finally:server.shutdown()
