@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="csrf-token" content="{{ csrf }}">
-  <title>SERVAMAR V93 · Pruebas</title>
+  <title>SERVAMAR V94 · Pruebas</title>
   <link rel="stylesheet" href="/test-assets/postgres-test.css">
   <script src="/test-assets/postgres-test.js" defer></script>
 </head>
 <body><main>
-  <header><p class="eyebrow">SERVAMAR <span>V93 · PRUEBAS</span></p><h1>Embarcaciones</h1>
+  <header><p class="eyebrow">SERVAMAR <span>V94 · PRUEBAS</span></p><h1>Embarcaciones</h1>
   <p>Administra registros ficticios y consulta sus movimientos.</p></header>
-  <aside class="notice"><strong>Solo datos ficticios.</strong> Este entorno está separado de la aplicación original. Los movimientos no calculan vencimientos ni envían notificaciones.</aside>
+  <aside class="notice"><strong>Solo datos ficticios.</strong> Este entorno está separado de la aplicación original. Cálculo disponible: 90 días + 9 meses calendario. El retorno hasta el día 90 conserva el permiso. No se envían notificaciones.</aside>
   <p id="message" role="status" aria-live="polite"></p>
   <section aria-labelledby="search-title"><h2 id="search-title">Buscar y reportar</h2>
     <form id="search-form"><div class="grid">
@@ -35,13 +35,14 @@
       <label>Número de registro<input name="registration_number" maxlength="100" placeholder="Registro ficticio"></label>
       <label>Capitán ficticio<input name="captain" maxlength="200" required></label>
       <label>Fecha de ingreso<input name="start_date" placeholder="dd/mm/yyyy" pattern="[0-9]{2}/[0-9]{2}/[0-9]{4}" maxlength="10"></label>
+      <label>Modo de vencimiento<select name="calculation_mode"><option value="calculated">Calcular según movimientos</option><option value="manual">Conservar fecha manual</option></select></label>
       <label>Vencimiento manual<input name="expiry_date" placeholder="dd/mm/yyyy" pattern="[0-9]{2}/[0-9]{2}/[0-9]{4}" maxlength="10"></label>
-    </div><p class="hint">Fechas en dd/mm/yyyy. El vencimiento es opcional y se registra manualmente.</p>
+    </div><p class="hint">Fechas en dd/mm/yyyy. El modo calculado usa 90 días iniciales; la ampliación suma nueve meses calendario. Los registros anteriores conservan sus fechas manuales hasta cambiar el modo.</p>
     <button type="submit">Guardar embarcación</button><button id="cancel-edit" type="button" class="secondary">Cancelar</button></form>
   </section>
   <section id="detail" hidden aria-labelledby="detail-title">
     <div class="section-heading"><h2 id="detail-title" tabindex="-1">Historial de movimientos</h2><button id="close-detail" type="button" class="secondary">Cerrar</button></div>
-    <p id="detail-name"></p><p id="last-movement" class="hint"></p><div id="movements"></div>
+    <p id="detail-name"></p><p id="permit-summary" class="notice"></p><p id="last-movement" class="hint"></p><div id="movements"></div>
     <h3>Contactos de prueba</h3><div id="contacts"></div>
     <form id="contact-form"><div class="grid">
       <label>Relación<select name="contact_role"><option value="captain">Capitán</option><option value="owner">Propietario</option><option value="representative">Representante</option><option value="other">Otro</option></select></label>
@@ -51,7 +52,7 @@
       <label><input name="is_primary" type="checkbox"> Contacto principal</label>
     </div><button id="contact-submit" type="submit">Guardar contacto ficticio</button><button id="contact-cancel" type="button" class="secondary">Cancelar edición</button></form>
     <h3 id="movement-heading">Registrar movimiento ficticio</h3>
-    <p class="hint">Queda en el historial sin modificar la etapa ni el vencimiento de la embarcación. Puedes editar o eliminar movimientos; la auditoría conserva la información anterior. Los cálculos de permisos siguen pendientes de confirmar.</p>
+    <p id="movement-help" class="hint">Puedes editar o eliminar movimientos. Se conserva la auditoría y, en modo calculado, se recalcula el permiso completo.</p>
     <form id="movement-form"><div class="grid">
       <label>Tipo<select name="kind"><option value="ingreso">Ingreso</option><option value="ampliacion">Ampliación</option><option value="deposito">Depósito</option><option value="salida">Salida</option><option value="retorno">Retorno</option><option value="cierre">Cierre</option></select></label>
       <label>Fecha del movimiento<input name="event_date" placeholder="dd/mm/yyyy" pattern="[0-9]{2}/[0-9]{2}/[0-9]{4}" maxlength="10" required></label>
@@ -69,7 +70,7 @@
     </div><button type="submit">Guardar documento</button></form>
   </section>
   <section id="notification-section" hidden aria-labelledby="notifications-title"><h2 id="notifications-title">Vista previa de recordatorio</h2>
-    <p class="notice">No se envían correos ni notificaciones. El vencimiento es manual; los cálculos definitivos están pendientes de confirmar.</p>
+    <p class="notice">No se envían correos ni notificaciones. Recordatorios: 30, 15 y 1 días antes del vencimiento. La vista previa identifica si la fecha es manual o calculada.</p>
     <button id="preview-notification" type="button">Preparar vista previa</button>
     <p id="notification-subject"></p><pre id="notification-body"></pre><p id="notification-reminders" class="hint"></p>
   </section>
