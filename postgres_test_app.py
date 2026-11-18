@@ -1,4 +1,4 @@
-"""SERVAMAR V98: independent fictional PostgreSQL console. Never imports app.py."""
+"""SERVAMAR V99: independent fictional PostgreSQL console. Never imports app.py."""
 import hashlib
 import hmac
 import os
@@ -199,7 +199,7 @@ def security_headers(response):
 
 @app.get('/healthz')
 def health():
-    return jsonify(service='servamar-postgres-test', version='V98', calculations_enabled=True, notifications_enabled=False, configured=configured())
+    return jsonify(service='servamar-postgres-test', version='V99', calculations_enabled=True, notifications_enabled=False, configured=configured())
 
 
 @app.get('/')
@@ -311,35 +311,6 @@ def movements(vessel_id):
         rows = db.execute('SELECT id,kind,event_date,expiry_date,description FROM servamar_test.history WHERE vessel_id=%s ORDER BY event_date NULLS LAST,id', (vessel_id,)).fetchall()
     keys = ('id', 'kind', 'event_date', 'expiry_date', 'description')
     return jsonify(movements=[dict(zip(keys, [v.isoformat() if isinstance(v, date) else v for v in row])) for row in rows])
-
-
-@app.post('/api/test/vessels/<int:vessel_id>/movements')
-@protected
-def add_movement(vessel_id):
-    data = payload()
-    kind = text_field(data, 'kind', 30)
-    if kind not in KINDS:
-        raise ApiError('Tipo de movimiento inválido')
-    event_date, expiry = parse_date(data.get('event_date')), parse_date(data.get('expiry_date'))
-    if not event_date:
-        raise ApiError('Fecha del movimiento requerida')
-    if expiry and expiry < event_date:
-        raise ApiError('Vencimiento anterior al movimiento')
-    description = text_field(data, 'description', 2000, required=False)
-    with connection() as db:
-        vessel = get_vessel(db, vessel_id, lock=True)
-        check_version(data, vessel)
-        if vessel['start_date'] and event_date < date.fromisoformat(vessel['start_date']):
-            raise ApiError('Movimiento anterior al ingreso')
-        row = db.execute('INSERT INTO servamar_test.history(vessel_id,kind,event_date,expiry_date,description,created_at) '
-                         'VALUES (%s,%s,%s,%s,%s,CURRENT_TIMESTAMP::text) RETURNING id',
-                         (vessel_id, kind, event_date, expiry, description)).fetchone()
-        automatic = recalculate(db, vessel_id)
-        db.execute('UPDATE servamar_test.vessels SET version=version+1 WHERE id=%s', (vessel_id,))
-        audit(db, vessel_id, 'movement', None, dict(id=row[0], kind=kind, event_date=event_date.isoformat(),
-                                                 expiry_date=expiry.isoformat() if expiry else None, description=description, automatic_notices=automatic))
-        updated = get_vessel(db, vessel_id)
-    return jsonify(id=row[0], created=True, vessel=updated), 201
 
 
 def recalculate(db, vessel_id):

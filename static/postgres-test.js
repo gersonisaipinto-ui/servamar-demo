@@ -3,6 +3,7 @@ const $ = selector => document.querySelector(selector);
 let editing = null, selected = null, deleting = null, editingMovement = null, editingContact = null;
 let detailRequest = 0, searchRequest = 0, searchSubmitted = false, reportRequest = 0, reportSubmitted = false;
 let currentView='inicio', returnView='inicio';
+let movementPreviewRequest=0, movementPreviewTimer;
 const labels = {ingreso:'Ingreso', ampliacion:'Ampliación', deposito:'Depósito', salida:'Salida', retorno:'Retorno', cierre:'Cierre'};
 const displayDate = value => value ? value.slice(0, 10).split('-').reverse().join('/') : '';
 function message(text, error=false) { $('#message').textContent=text; $('#message').classList.toggle('error',error); }
@@ -18,7 +19,7 @@ async function api(path, method='GET', body) {
 async function busy(element, task) {
   const buttons=element.matches('button')?[element]:[...element.querySelectorAll('button')];
   buttons.forEach(b=>b.disabled=true);
-  try { await task(); } catch(error) { message(error.message,true); }
+  try { await task(); } catch(error) { message(error.message,true); if(element.id==='movement-form')$('#movement-feedback').textContent=error.message; }
   finally { buttons.forEach(b=>b.disabled=false); }
 }
 function action(text, task, style='secondary') {
@@ -83,8 +84,8 @@ async function openHistory(id, focusNotices=false) {
   renderNotificationPlan(plan);
   $('#automatic-notification-status').textContent='Los avisos de correo y notificación siguen el vencimiento actual: '+(displayDate(selected.expiry_date)||'sin fecha')+'. Los envíos reales siguen deshabilitados en pruebas.';
   $('#permit-summary').textContent=(selected.plazo||'Vencimiento manual: '+displayDate(selected.expiry_date))+(selected.days_added?' · '+selected.days_added+' días añadidos por retornos':'');
-  $('#movement-help').textContent=selected.calculation_mode==='calculated'?'Cada cambio recalcula el historial completo. Retorno hasta el día 90 inclusive; cierre desde el día 91.':'Este expediente conserva fecha manual. Cambia el modo al editar la embarcación para aplicar el cálculo.';
-  $('#movement-form').elements.expiry_date.disabled=selected.calculation_mode==='calculated';
+  $('#movement-help').textContent=selected.calculation_mode==='calculated'?'Cada cambio recalcula el historial completo. Retorno hasta el día 90 inclusive; cierre desde el día 91.':'Este expediente tiene fecha manual. Al guardar con el cálculo activado, se validará su historial y se actualizarán el permiso y los recordatorios juntos.';
+  $('#movement-calculation-option').hidden=selected.calculation_mode==='calculated';
   const last=history.movements.at(-1);
   $('#last-movement').textContent=last?'Último movimiento: '+(labels[last.kind]||last.kind)+' el '+displayDate(last.event_date):'Sin movimientos.';
   $('#document-section').hidden=false;$('#notification-section').hidden=false;
@@ -109,7 +110,7 @@ async function openHistory(id, focusNotices=false) {
       editingMovement=m;
       const form=$('#movement-form');
       for(const key of ['kind','event_date','expiry_date','description'])form.elements[key].value=key.endsWith('_date')?displayDate(m[key]):m[key]||'';
-      syncDates(form);$('#movement-heading').textContent='Editar movimiento';form.elements.kind.focus();
+      syncDates(form);queueMovementPreview();$('#movement-heading').textContent='Editar movimiento';form.elements.kind.focus();
     }),action('Eliminar movimiento',async()=>{
       const confirmation=prompt('Escribe '+selected.declaration+' para eliminar este movimiento. Se conservará su auditoría.');
       if(confirmation===null)return;
@@ -137,7 +138,7 @@ async function openHistory(id, focusNotices=false) {
   if(!contacts.contacts.length)$('#contacts').append(node('p','Sin contactos ficticios.','muted'));
   editingContact=null;editingMovement=null;$('#movement-heading').textContent='Registrar movimiento ficticio';
   $('#contact-form').reset();
-  $('#movement-form').reset(); syncDates($('#movement-form'));
+  resetMovementForm();
   (focusNotices?$('#notifications-title'):$('#detail-title')).focus();
 }
 async function openDelete(id) {
@@ -154,11 +155,12 @@ $('#new-vessel').onclick=()=>showEditor();
 $('#refresh').onclick=event=>busy(event.target,refresh);
 $('#cancel-edit').onclick=()=>{ $('#editor').hidden=true; editing=null;showView(returnView,true); };
 function hideDetail(){
+  ++movementPreviewRequest;clearTimeout(movementPreviewTimer);
   ++detailRequest;$('#detail').hidden=true;$('#document-section').hidden=true;$('#notification-section').hidden=true;
   selected=null;editingMovement=null;editingContact=null;
 }
 $('#close-detail').onclick=()=>{hideDetail();showView(returnView,true);};
-$('#cancel-movement').onclick=()=>{editingMovement=null;$('#movement-form').reset();$('#movement-heading').textContent='Registrar movimiento ficticio';};
+$('#cancel-movement').onclick=()=>{editingMovement=null;resetMovementForm();$('#movement-heading').textContent='Registrar movimiento ficticio';};
 $('#contact-cancel').onclick=()=>{editingContact=null;$('#contact-form').reset();};
 $('#cancel-delete').onclick=()=>$('#delete-dialog').close();
 $('#vessel-form').onsubmit=event=>{
@@ -174,9 +176,11 @@ $('#movement-form').onsubmit=event=>{
   event.preventDefault(); const form=event.target; const current=selected;
   if(!current)return;
   busy(form,async()=>{
-    const data=Object.fromEntries(new FormData(form)); data.version=current.version;
-    await api('/api/test/vessels/'+current.id+'/movements'+(editingMovement?'/'+editingMovement.id:''),editingMovement?'PUT':'POST',data);
-    message('Movimiento guardado en el historial.'); await openHistory(current.id); await refresh();
+    ++movementPreviewRequest;clearTimeout(movementPreviewTimer);$('#movement-feedback').textContent='';
+    const data=movementData(), movementId=editingMovement?.id;
+    const result=await api('/api/test/vessels/'+current.id+'/movements'+(movementId?'/'+movementId:''),movementId?'PUT':'POST',data);
+    message(result.projection_applied?'Movimiento guardado. Vencimiento: '+displayDate(result.vessel.expiry_date)+'. Recordatorios recalculados; sin envíos.':'Movimiento de referencia guardado. La fecha manual del permiso se conserva.');
+    await openHistory(current.id); await refresh();
   });
 };
 $('#delete-form').onsubmit=async event=>{
@@ -263,9 +267,60 @@ $('#preview-notification').onclick=event=>{
 
 function syncEditorMode(){
   const form=$('#vessel-form');const calculated=form.elements.calculation_mode.value==='calculated';
-  form.elements.expiry_date.disabled=calculated;form.elements.start_date.required=calculated;syncDates(form);
+  form.elements.expiry_date.disabled=calculated;form.elements.start_date.required=calculated;
+  $('#initial-expiry-field').hidden=!calculated;updateInitialExpiry();syncDates(form);
 }
 $('#vessel-form').elements.calculation_mode.onchange=syncEditorMode;
+function updateInitialExpiry(){
+  const iso=dateISO($('#vessel-form').elements.start_date.value);
+  const value=iso?new Date(iso+'T12:00:00Z'):null;
+  if(value)value.setUTCDate(value.getUTCDate()+90);
+  $('#initial-expiry').value=value?displayDate(value.toISOString()):'';
+}
+function movementData(){
+  const form=$('#movement-form'),data=Object.fromEntries(new FormData(form));
+  data.version=selected.version;data.apply_calculation=selected.calculation_mode==='calculated'||form.elements.apply_calculation.checked;
+  if(editingMovement)data.movement_id=editingMovement.id;
+  return data;
+}
+function resetMovementForm(){
+  const form=$('#movement-form');form.reset();
+  form.elements.kind.value=({ingreso:'ampliacion',ampliacion:'deposito',salida:'retorno',cierre:'ingreso'})[selected?.stage]||'cierre';
+  syncDates(form);queueMovementPreview();
+}
+function queueMovementPreview(){
+  const sequence=++movementPreviewRequest;clearTimeout(movementPreviewTimer);
+  if(!selected)return;
+  const form=$('#movement-form'),calculated=selected.calculation_mode==='calculated'||form.elements.apply_calculation.checked;
+  const extension=form.elements.kind.value==='ampliacion';
+  form.elements.event_date.required=!extension;
+  document.querySelector('label[for="'+form.elements.event_date.id+'"]').firstChild.textContent=extension?'Fecha de autorización (opcional)':'Fecha del movimiento';
+  form.elements.expiry_date.disabled=calculated;syncDates(form);
+  $('#movement-calculated-field').hidden=!calculated;
+  $('#movement-calculated-expiry').value='';$('#movement-feedback').textContent='';
+  if(!calculated){$('#movement-preview').textContent='Solo se guardará una referencia en el historial. La fecha manual del permiso no cambiará.';return;}
+  if(!dateISO(form.elements.event_date.value)&&!(extension&&!form.elements.event_date.value)){
+    $('#movement-preview').textContent='Completa una fecha válida para ver el vencimiento calculado.';return;
+  }
+  $('#movement-preview').textContent='Calculando vencimiento…';
+  const current=selected,data=movementData();
+  movementPreviewTimer=setTimeout(async()=>{
+    try{
+      const result=await api('/api/test/vessels/'+current.id+'/movements/preview','POST',data);
+      if(sequence!==movementPreviewRequest||selected?.id!==current.id)return;
+      const projected=result.projection;
+      $('#movement-calculated-expiry').value=displayDate(projected.expiry_date);
+      $('#movement-preview').textContent=projected.explanation+' Fecha del movimiento: '+displayDate(result.effective_event_date)+'.'+
+        (result.mode_will_change?' Al guardar se activará el cálculo de este expediente.':'')+
+        ' Los avisos seguirán el vencimiento vigente a 30, 15 y 1 días; sin envíos.';
+    }catch(error){
+      if(sequence!==movementPreviewRequest||selected?.id!==current.id)return;
+      $('#movement-preview').textContent='No se puede calcular este movimiento.';$('#movement-feedback').textContent=error.message;
+    }
+  },200);
+}
+$('#movement-form').addEventListener('input',event=>{if(event.target.name!=='description')queueMovementPreview();});
+$('#vessel-form').addEventListener('input',updateInitialExpiry);
 
 // Group channels only when their date, deadline and status match. Sent and cancelled
 // entries remain distinct from future plans, including after undoing a movement.

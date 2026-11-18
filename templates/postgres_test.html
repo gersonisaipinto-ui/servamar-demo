@@ -38,6 +38,7 @@
       <label>Fecha de ingreso<input name="start_date" data-date inputmode="numeric" placeholder="dd/mm/yyyy" pattern="[0-9]{2}/[0-9]{2}/[0-9]{4}" maxlength="10"></label>
       <label>Modo de vencimiento<select name="calculation_mode"><option value="calculated">Calcular según movimientos</option><option value="manual">Conservar fecha manual</option></select></label>
       <label>Vencimiento manual<input name="expiry_date" data-date inputmode="numeric" placeholder="dd/mm/yyyy" pattern="[0-9]{2}/[0-9]{2}/[0-9]{4}" maxlength="10"></label>
+      <label id="initial-expiry-field">Vencimiento inicial calculado (90 días)<input id="initial-expiry" readonly placeholder="Completa la fecha de ingreso"></label>
     </div><p class="hint">Fechas en dd/mm/yyyy. El modo calculado usa 90 días iniciales; la ampliación suma nueve meses calendario. Los registros anteriores conservan sus fechas manuales hasta cambiar el modo.</p>
     <button type="submit">Guardar embarcación</button><button id="cancel-edit" type="button" class="secondary">Cancelar</button></form>
   </section>
@@ -95,8 +96,12 @@
       <label>Tipo<select name="kind"><option value="ingreso">Ingreso</option><option value="ampliacion">Ampliación</option><option value="deposito">Depósito</option><option value="salida">Salida</option><option value="retorno">Retorno</option><option value="cierre">Cierre</option></select></label>
       <label>Fecha del movimiento<input name="event_date" data-date inputmode="numeric" placeholder="dd/mm/yyyy" pattern="[0-9]{2}/[0-9]{2}/[0-9]{4}" maxlength="10" required></label>
       <label>Vencimiento de referencia (opcional)<input name="expiry_date" data-date inputmode="numeric" placeholder="dd/mm/yyyy" pattern="[0-9]{2}/[0-9]{2}/[0-9]{4}" maxlength="10"></label>
+      <label id="movement-calculated-field">Vencimiento calculado<input id="movement-calculated-expiry" readonly placeholder="Completa el movimiento"></label>
       <label class="wide">Descripción<textarea name="description" maxlength="2000" rows="3" placeholder="Solo información ficticia"></textarea></label>
-    </div><button type="submit">Guardar movimiento</button><button id="cancel-movement" type="button" class="secondary">Cancelar edición</button></form>
+    </div><label id="movement-calculation-option"><input name="apply_calculation" type="checkbox" checked> Aplicar el cálculo del permiso al guardar este movimiento</label>
+    <p id="movement-preview" class="expiry-banner" role="status" aria-live="polite"></p>
+    <p id="movement-feedback" class="form-error" role="alert"></p>
+    <button type="submit">Guardar movimiento</button><button id="cancel-movement" type="button" class="secondary">Cancelar edición</button></form>
     </div></details>
   </section>
   <section id="document-section" class="panel" hidden aria-labelledby="documents-title"><h2 id="documents-title">Documentos del expediente</h2>
