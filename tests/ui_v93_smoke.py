@@ -68,6 +68,8 @@ try:
         page.get_by_role('button',name='Editar movimiento',exact=True).click()
         page.locator('#movement-form [name=kind]').select_option('ampliacion')
         page.get_by_role('button',name='Guardar movimiento',exact=True).click()
+        expect(page.locator('#last-movement')).to_contain_text('Ampliación')
+        expect(page.get_by_role('button',name='Guardar movimiento',exact=True)).to_be_enabled()
         expect(page.locator('#automatic-notification-status')).to_contain_text('siguen el vencimiento actual: 02/02/2027')
         page.locator('#document-form [name=document]').set_input_files({'name':'ficticio.pdf','mimeType':'application/pdf','buffer':b'%PDF-ficticio'})
         page.locator('#document-form [name=fictional_confirmed]').check()
