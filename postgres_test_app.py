@@ -1,4 +1,4 @@
-"""SERVAMAR V95: independent fictional PostgreSQL console. Never imports app.py."""
+"""SERVAMAR V96: independent fictional PostgreSQL console. Never imports app.py."""
 import hashlib
 import hmac
 import os
@@ -199,7 +199,7 @@ def security_headers(response):
 
 @app.get('/healthz')
 def health():
-    return jsonify(service='servamar-postgres-test', version='V95', calculations_enabled=True, notifications_enabled=False, configured=configured())
+    return jsonify(service='servamar-postgres-test', version='V96', calculations_enabled=True, notifications_enabled=False, configured=configured())
 
 
 @app.get('/')
@@ -288,7 +288,7 @@ def delete_vessel(vessel_id):
                             (vessel_id, vessel_id)).fetchone()
         if any(counts):
             raise ApiError('Eliminación bloqueada: existen movimientos o alertas vinculadas', 409)
-        # The foreign keys remain RESTRICT; never delete child records here.
+        # Business records remain RESTRICT; derived reminder plans use ON DELETE CASCADE.
         db.execute('DELETE FROM servamar_test.vessels WHERE id=%s', (vessel_id,))
         audit(db, vessel_id, 'delete', vessel, None)
     return jsonify(deleted=True, id=vessel_id)
@@ -334,9 +334,7 @@ def add_movement(vessel_id):
         row = db.execute('INSERT INTO servamar_test.history(vessel_id,kind,event_date,expiry_date,description,created_at) '
                          'VALUES (%s,%s,%s,%s,%s,CURRENT_TIMESTAMP::text) RETURNING id',
                          (vessel_id, kind, event_date, expiry, description)).fetchone()
-        recalculate(db, vessel_id)
-        from postgres_test_notifications import suspend_automatic_notices
-        automatic = suspend_automatic_notices(db, vessel_id, kind)
+        automatic = recalculate(db, vessel_id)
         db.execute('UPDATE servamar_test.vessels SET version=version+1 WHERE id=%s', (vessel_id,))
         audit(db, vessel_id, 'movement', None, dict(id=row[0], kind=kind, event_date=event_date.isoformat(),
                                                  expiry_date=expiry.isoformat() if expiry else None, description=description, automatic_notices=automatic))
@@ -347,6 +345,8 @@ def add_movement(vessel_id):
 def recalculate(db, vessel_id):
     from postgres_test_permits import persist
     persist(db, vessel_id, ApiError)
+    from postgres_test_notifications import reconcile_schedule
+    return reconcile_schedule(db, get_vessel(db, vessel_id))
 
 
 from postgres_test_contacts import register as register_contacts

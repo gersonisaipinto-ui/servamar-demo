@@ -1,7 +1,6 @@
 """Editable fictional history. Calculated records replay atomically after each correction."""
 from datetime import date
 from flask import jsonify
-from postgres_test_notifications import suspend_automatic_notices
 
 
 def register(app, protected, connection, get_vessel, check_version, audit, payload,
@@ -34,8 +33,7 @@ def register(app, protected, connection, get_vessel, check_version, audit, paylo
                 raise ApiError('Movimiento anterior al ingreso')
             db.execute('UPDATE servamar_test.history SET kind=%s,event_date=%s,expiry_date=%s,description=%s '
                        'WHERE vessel_id=%s AND id=%s', (kind,event,expiry,description,vessel_id,movement_id))
-            recalculate(db, vessel_id)
-            automatic=suspend_automatic_notices(db, vessel_id, kind)
+            automatic=recalculate(db, vessel_id)
             db.execute('UPDATE servamar_test.vessels SET version=version+1 WHERE id=%s', (vessel_id,))
             after = record(db, vessel_id, movement_id)
             audit(db, vessel_id, 'movement_edit', before, dict(after,automatic_notices=automatic))

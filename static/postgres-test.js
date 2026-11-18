@@ -51,9 +51,7 @@ async function openHistory(id) {
   if(requestId!==detailRequest)return;
   selected=detail.vessel; editing=null; $('#editor').hidden=true; $('#detail').hidden=false;
   $('#detail-name').textContent=selected.declaration+' · '+selected.name;
-  $('#automatic-notification-status').textContent=selected.automatic_notices_suspended
-    ? 'Correos y notificaciones automáticos desactivados por '+(labels[selected.automatic_notices_reason]||'movimiento registrado')+'. No se reactivan al editar o eliminar movimientos.'
-    : 'Envíos automáticos deshabilitados en el entorno de pruebas.';
+  $('#automatic-notification-status').textContent='Los avisos de correo y notificación siguen el vencimiento actual: '+displayDate(selected.expiry_date)+'. Los envíos reales siguen deshabilitados en pruebas.';
   $('#permit-summary').textContent=(selected.plazo||'Vencimiento manual: '+displayDate(selected.expiry_date))+(selected.days_added?' · '+selected.days_added+' días añadidos por retornos':'');
   $('#movement-help').textContent=selected.calculation_mode==='calculated'?'Cada cambio recalcula el historial completo. Retorno hasta el día 90 inclusive; cierre desde el día 91.':'Este expediente conserva fecha manual. Cambia el modo al editar la embarcación para aplicar el cálculo.';
   $('#movement-form').elements.expiry_date.disabled=selected.calculation_mode==='calculated';
@@ -224,7 +222,7 @@ $('#preview-notification').onclick=event=>{
     const result=await api('/api/test/vessels/'+current.id+'/notifications/preview');
     if(!selected||selected.id!==current.id)return;
     $('#notification-subject').textContent=result.subject;$('#notification-body').textContent=result.body;
-    $('#notification-reminders').textContent=result.warning+' '+result.reminders.map(r=>r.days_before+' días: '+displayDate(r.date)).join(' · ');
+    $('#notification-reminders').textContent=result.warning+' '+result.reminders.map(r=>r.days_before+' días: '+displayDate(r.date)+(r.status==='elapsed'?' (fecha pasada)':'')).join(' · ');
   });
 };
 
