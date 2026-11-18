@@ -1,7 +1,7 @@
 'use strict';
 const $ = selector => document.querySelector(selector);
 let editing = null, selected = null, deleting = null, editingMovement = null, editingContact = null;
-let detailRequest = 0;
+let detailRequest = 0, searchRequest = 0, searchSubmitted = false;
 const labels = {ingreso:'Ingreso', ampliacion:'Ampliación', deposito:'Depósito', salida:'Salida', retorno:'Retorno', cierre:'Cierre'};
 const displayDate = value => value ? value.slice(0, 10).split('-').reverse().join('/') : '';
 function message(text, error=false) { $('#message').textContent=text; $('#message').classList.toggle('error',error); }
@@ -35,7 +35,8 @@ async function refresh() {
     return card;
   }));
   if(!data.vessels.length) $('#rows').append(node('p','No hay embarcaciones ficticias. Agrega la primera.'));
-  await Promise.all([searchRecords(),loadExpiring()]);
+  $('#records-count').textContent=' ('+data.vessels.length+')';
+  await Promise.all([searchSubmitted?searchRecords():Promise.resolve(),loadExpiring()]);
 }
 function showEditor(v=null) {
   hideDetail(); editing=v; $('#vessel-form').reset(); $('#editor-title').textContent=v?'Editar embarcación':'Agregar embarcación';
@@ -47,11 +48,12 @@ function showEditor(v=null) {
 async function openEdit(id) { const data=await api('/api/test/vessels/'+id); showEditor(data.vessel); }
 async function openHistory(id) {
   const requestId=++detailRequest;
-  const [detail,history,contacts,documents]=await Promise.all([api('/api/test/vessels/'+id),api('/api/test/vessels/'+id+'/movements'),api('/api/test/vessels/'+id+'/contacts'),api('/api/test/vessels/'+id+'/documents')]);
+  const [detail,history,contacts,documents,plan]=await Promise.all([api('/api/test/vessels/'+id),api('/api/test/vessels/'+id+'/movements'),api('/api/test/vessels/'+id+'/contacts'),api('/api/test/vessels/'+id+'/documents'),api('/api/test/vessels/'+id+'/notifications/plan')]);
   if(requestId!==detailRequest)return;
   selected=detail.vessel; editing=null; $('#editor').hidden=true; $('#detail').hidden=false;
   $('#detail-name').textContent=selected.declaration+' · '+selected.name;
-  $('#automatic-notification-status').textContent='Los avisos de correo y notificación siguen el vencimiento actual: '+displayDate(selected.expiry_date)+'. Los envíos reales siguen deshabilitados en pruebas.';
+  renderNotificationPlan(plan);
+  $('#automatic-notification-status').textContent='Los avisos de correo y notificación siguen el vencimiento actual: '+(displayDate(selected.expiry_date)||'sin fecha')+'. Los envíos reales siguen deshabilitados en pruebas.';
   $('#permit-summary').textContent=(selected.plazo||'Vencimiento manual: '+displayDate(selected.expiry_date))+(selected.days_added?' · '+selected.days_added+' días añadidos por retornos':'');
   $('#movement-help').textContent=selected.calculation_mode==='calculated'?'Cada cambio recalcula el historial completo. Retorno hasta el día 90 inclusive; cierre desde el día 91.':'Este expediente conserva fecha manual. Cambia el modo al editar la embarcación para aplicar el cálculo.';
   $('#movement-form').elements.expiry_date.disabled=selected.calculation_mode==='calculated';
@@ -79,7 +81,7 @@ async function openHistory(id) {
       editingMovement=m;
       const form=$('#movement-form');
       for(const key of ['kind','event_date','expiry_date','description'])form.elements[key].value=key.endsWith('_date')?displayDate(m[key]):m[key]||'';
-      $('#movement-heading').textContent='Editar movimiento';form.elements.kind.focus();
+      syncDates(form);$('#movement-heading').textContent='Editar movimiento';form.elements.kind.focus();
     }),action('Eliminar movimiento',async()=>{
       const confirmation=prompt('Escribe '+selected.declaration+' para eliminar este movimiento. Se conservará su auditoría.');
       if(confirmation===null)return;
@@ -107,7 +109,7 @@ async function openHistory(id) {
   if(!contacts.contacts.length)$('#contacts').append(node('p','Sin contactos ficticios.','muted'));
   editingContact=null;editingMovement=null;$('#movement-heading').textContent='Registrar movimiento ficticio';
   $('#contact-form').reset();
-  $('#movement-form').reset(); $('#detail-title').focus();
+  $('#movement-form').reset(); syncDates($('#movement-form'));$('#detail-title').focus();
 }
 async function openDelete(id) {
   const data=await api('/api/test/vessels/'+id); deleting=data.vessel;
@@ -158,7 +160,6 @@ $('#delete-form').onsubmit=async event=>{
   } catch(error) { $('#delete-error').textContent=error.message; }
   finally { $('#confirm-delete').disabled=false; }
 };
-refresh().catch(error=>message(error.message,true));
 
 $('#contact-form').onsubmit=event=>{
   event.preventDefault();const form=event.target;const current=selected;
@@ -174,11 +175,13 @@ $('#contact-form').onsubmit=event=>{
 function searchParams() {
   const data=new FormData($('#search-form'));
   const params=new URLSearchParams();
-  for(const key of ['q','month','date_field','from','to'])if(data.get(key))params.set(key,data.get(key));
+  for(const key of ['q','month','date_field','stage','from','to'])if(data.get(key))params.set(key,data.get(key));
   return params.toString();
 }
 async function searchRecords(){
+  const requestId=++searchRequest;
   const result=await api('/api/test/search?'+searchParams());
+  if(requestId!==searchRequest)return;
   $('#search-count').textContent=result.count+' resultados'+(result.capped?' (límite de 1000)':'');
   $('#search-results').replaceChildren(...result.vessels.map(v=>{
     const item=node('article','','card');
@@ -193,13 +196,14 @@ async function loadExpiring(){
   $('#expiring-results').replaceChildren(...result.vessels.map(v=>{
     const item=node('article','','card');
     item.append(node('strong',v.name),node('p',v.declaration+' · '+v.captain),
-      node('p',v.plazo||(v.days_remaining+' días restantes · '+displayDate(v.expiry_date))));
+      node('p',v.plazo||(v.days_remaining+' días restantes · '+displayDate(v.expiry_date))),
+      action('Ver expediente',()=>openHistory(v.id)));
     return item;
   }));
   if(!result.vessels.length)$('#expiring-results').append(node('p','No hay vencimientos en los próximos 30 días.','muted'));
 }
-$('#search-form').onsubmit=e=>{e.preventDefault();busy(e.target,searchRecords);};
-$('#clear-search').onclick=()=>{$('#search-form').reset();searchRecords().catch(e=>message(e.message,true));};
+$('#search-form').onsubmit=e=>{e.preventDefault();searchSubmitted=true;busy(e.target,searchRecords);};
+$('#clear-search').onclick=()=>{$('#search-form').reset();searchSubmitted=false;++searchRequest;$('#search-count').textContent='Usa los filtros y pulsa Buscar para consultar otros expedientes.';$('#search-results').replaceChildren();};
 async function download(path,filename){
   const response=await fetch(path,{credentials:'same-origin',cache:'no-store'});
   if(!response.ok){let result;try{result=await response.json();}catch{throw new Error('No se pudo descargar el archivo');}throw new Error(result.error||'No se pudo descargar el archivo');}
@@ -228,6 +232,80 @@ $('#preview-notification').onclick=event=>{
 
 function syncEditorMode(){
   const form=$('#vessel-form');const calculated=form.elements.calculation_mode.value==='calculated';
-  form.elements.expiry_date.disabled=calculated;form.elements.start_date.required=calculated;
+  form.elements.expiry_date.disabled=calculated;form.elements.start_date.required=calculated;syncDates(form);
 }
 $('#vessel-form').elements.calculation_mode.onchange=syncEditorMode;
+
+// Group channels only when their date, deadline and status match. Sent and cancelled
+// entries remain distinct from future plans, including after undoing a movement.
+function renderNotificationPlan(result){
+  const channels={email:'Correo',push:'Android / push',windows:'Windows'};
+  const statuses={planned:'Planificado · sin envío',cancelled:'Cancelado',elapsed:'Fecha pasada',sent:'Ya enviado'};
+  const groups=new Map();
+  for(const plan of result.plans){
+    const key=[plan.expiry_date,plan.date,plan.days_before,plan.status].join('|');
+    if(!groups.has(key))groups.set(key,{...plan,channels:new Set()});
+    groups.get(key).channels.add(channels[plan.channel]||plan.channel);
+  }
+  const current=[],history=[];
+  for(const plan of groups.values()){
+    const card=node('article','','card');
+    card.append(node('strong',displayDate(plan.date)+' · '+plan.days_before+' días antes'),
+      node('p',statuses[plan.status]||plan.status,'plan-status '+plan.status),
+      node('p','Vencimiento: '+displayDate(plan.expiry_date)),node('p',[...plan.channels].join(' · ')));
+    (plan.status==='planned'&&plan.expiry_date===result.expiry_date?current:history).push(card);
+  }
+  $('#notification-plan').replaceChildren(...current);
+  if(!current.length)$('#notification-plan').append(node('p','No hay avisos futuros pendientes para el vencimiento actual.','muted'));
+  $('#notification-history-rows').replaceChildren(...history);
+  $('#notification-history-count').textContent=' ('+history.length+')';
+  $('#notification-history').hidden=!history.length;
+  $('#notification-plan-limit').hidden=!result.capped;
+}
+
+// Date text is the submitted value. The native calendar has no name and uses ISO
+// only to communicate with the browser, avoiding locale and timezone conversion.
+function dateISO(value){
+  const match=/^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value);
+  if(!match)return '';
+  const [,day,month,year]=match;
+  const iso=year+'-'+month+'-'+day;
+  const parsed=new Date(iso+'T12:00:00Z');
+  return !Number.isNaN(parsed.getTime())&&parsed.toISOString().slice(0,10)===iso?iso:'';
+}
+function syncDates(scope){
+  for(const input of scope.querySelectorAll('[data-date]')){
+    const calendar=document.getElementById(input.id+'-calendar');
+    if(!calendar)continue;
+    calendar.value=dateISO(input.value);calendar.disabled=input.disabled;
+    input.setCustomValidity(input.value.length===10&&!calendar.value?'Escribe una fecha válida en dd/mm/yyyy.':'');
+  }
+}
+function enhanceDates(){
+  for(const [index,input] of [...document.querySelectorAll('[data-date]')].entries()){
+    const label=input.closest('label');const caption=label.textContent.trim();
+    input.id=input.id||'date-'+index;label.htmlFor=input.id;
+    const field=document.createElement('div');label.before(field);field.append(label);
+    const wrapper=document.createElement('span');wrapper.className='date-control';
+    const calendar=document.createElement('input');calendar.type='date';calendar.className='date-calendar';
+    calendar.id=input.id+'-calendar';calendar.setAttribute('aria-label','Calendario: '+caption);
+    calendar.title='Elegir '+caption.toLowerCase()+' en calendario';
+    wrapper.append(input,calendar);field.append(wrapper);
+    input.addEventListener('input',event=>{
+      if(!event.inputType||!event.inputType.startsWith('delete')){
+        const raw=input.value,iso=/^\d{4}-\d{2}-\d{2}$/.test(raw);
+        const digitsBefore=raw.slice(0,input.selectionStart).replace(/\D/g,'').length;
+        const digits=(iso?displayDate(raw):raw).replace(/\D/g,'').slice(0,8);
+        input.value=digits.slice(0,2)+(digits.length>2?'/'+digits.slice(2,4):'')+(digits.length>4?'/'+digits.slice(4):'');
+        const position=iso?input.value.length:digitsBefore+(digitsBefore>2?1:0)+(digitsBefore>4?1:0);
+        input.setSelectionRange(position,position);
+      }
+      syncDates(input.form);
+    });
+    calendar.addEventListener('input',()=>{input.value=displayDate(calendar.value);syncDates(input.form);});
+  }
+  for(const form of document.forms)form.addEventListener('reset',()=>queueMicrotask(()=>syncDates(form)));
+  syncDates(document);
+}
+enhanceDates();
+refresh().catch(error=>message(error.message,true));
