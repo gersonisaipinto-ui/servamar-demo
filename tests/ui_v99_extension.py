@@ -43,7 +43,7 @@ try:
             def open_record():
                 page.locator('.tabs [data-view=buscar]').click()
                 page.locator('#records-section summary').click()
-                page.locator('#rows').get_by_role('button', name='Movimientos', exact=True).click()
+                page.locator('#rows tr').filter(has_text=vessel['name']).get_by_role('button', name='Movimientos', exact=True).click()
                 expect(page.locator('#detail-name')).to_contain_text(vessel['name'])
 
             page.goto('https://127.0.0.1:8799'); open_record()
@@ -103,8 +103,42 @@ try:
             assert not errors,errors
             assert not sends,sends
             page.screenshot(path=str(artifacts/'v99-extension-deposit-saved-mobile.png'), full_page=True)
+            # Late authorization must start at the expiry adjusted by 37 days outside.
+            vessel=fixture.create(name='Velero ficticio ampliación tardía V100',start_date='17/08/2026',expiry_date='22/12/2026')
+            vessel,_=fixture.add(vessel,'salida','20/08/2026')
+            vessel,_=fixture.add(vessel,'retorno','26/09/2026')
+            api_path=fixture.path(vessel)
+            page.reload();open_record()
+            page.locator('#movement-form [name=kind]').select_option('ampliacion')
+            page.locator('#movement-form [name=event_date]').fill('15012027')
+            expect(page.locator('#movement-calculated-expiry')).to_have_value('22/09/2027')
+            expect(page.locator('#movement-preview')).to_contain_text('22/12/2026 + 9 meses calendario = 22/09/2027')
+            expect(page.locator('#movement-preview')).to_contain_text('37 días añadidos por retornos')
+            expect(page.locator('#movement-preview')).to_contain_text('Autorización 24 días después')
+            expect(page.locator('#movement-preview')).to_contain_text('Fecha de autorización futura')
+            save.click()
+            expect(page.locator('#permit-summary')).to_contain_text('22/09/2027')
+            expect(save).to_be_enabled()
+            expect(page.locator('#extension-basis')).to_contain_text('22/12/2026 + 9 meses calendario = 22/09/2027')
+            expect(page.locator('#extension-basis')).to_contain_text('37 días añadidos por retornos')
+            expect(page.locator('#notification-plan')).to_contain_text('23/08/2027 · 30 días antes')
+            page.reload();open_record()
+            expect(page.locator('#extension-basis')).to_contain_text('15/01/2027')
+            expect(page.locator('#permit-summary')).to_contain_text('22/09/2027')
+            for width in (390,1440):
+                page.set_viewport_size({'width':width,'height':1000})
+                page.screenshot(path=str(artifacts/f'v100-late-extension-{width}.png'),full_page=True)
+                assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+            saved=fixture.request('GET',api_path).json['vessel']
+            assert saved['extension']['base_expiry_date']=='2026-12-22'
+            assert saved['expiry_date']=='2027-09-22'
+            plan=fixture.request('GET',api_path+'/notifications/plan').json
+            assert all(p['status']=='cancelled' for p in plan['plans'] if p['expiry_date']=='2026-12-22')
+            assert len([p for p in plan['plans'] if p['status']=='planned'])==9
+            assert not errors,errors
+            assert not sends,sends
             browser.close()
-    print('PASS V99: real PostgreSQL browser extension save, manual conversion, optional authorization date, calculation preview, reload persistence, duplicate rollback, deposit and 30/15/1 rescheduling; no sends')
+    print('PASS V100: late authorization after 37 days outside, visible start/date distinction, persistence and rescheduling; V99: real PostgreSQL browser extension save, manual conversion, optional authorization date, calculation preview, reload persistence, duplicate rollback, deposit and 30/15/1 rescheduling; no sends')
 finally:
     if server: server.shutdown()
     fixture.doCleanups()

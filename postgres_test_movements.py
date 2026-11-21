@@ -39,8 +39,14 @@ def register(app, protected, connection, get_vessel, check_version, audit, paylo
             event = movement['event_date']; kind = movement['kind']
             formatted = lambda value: permits.as_date(value).strftime('%d/%m/%Y')
             if kind == 'ampliacion':
-                base = permits.calculate(vessel['start_date'], prior, event)['expiry_date']
+                extension = at_event['extension']
+                base = extension['base_expiry_date']
                 explanation = f'{formatted(base)} + 9 meses calendario = {formatted(at_event["expiry_date"])}.'
+                explanation += f' El inicio toma el último vencimiento, incluidos {extension["days_added_before_extension"]} días añadidos por retornos.'
+                if extension['late_days']:
+                    explanation += f' Autorización {extension["late_days"]} días después: conserva ese inicio.'
+                if event > permits.today_guatemala():
+                    explanation += ' Fecha de autorización futura registrada en pruebas.'
             elif kind in ('ingreso', 'deposito'):
                 term = '90 días' if kind == 'ingreso' else '12 meses calendario'
                 explanation = f'{formatted(event)} + {term} = {formatted(at_event["expiry_date"])}.'

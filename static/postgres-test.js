@@ -84,6 +84,12 @@ async function openHistory(id, focusNotices=false) {
   renderNotificationPlan(plan);
   $('#automatic-notification-status').textContent='Los avisos de correo y notificación siguen el vencimiento actual: '+(displayDate(selected.expiry_date)||'sin fecha')+'. Los envíos reales siguen deshabilitados en pruebas.';
   $('#permit-summary').textContent=(selected.plazo||'Vencimiento manual: '+displayDate(selected.expiry_date))+(selected.days_added?' · '+selected.days_added+' días añadidos por retornos':'');
+  const extension=selected.extension;
+  $('#extension-basis').hidden=!extension;
+  $('#extension-basis').textContent=extension?'Ampliación: '+displayDate(extension.base_expiry_date)+' + 9 meses calendario = '+displayDate(extension.expiry_date)+
+    '. Inicio sobre el último vencimiento, incluidos '+extension.days_added_before_extension+' días añadidos por retornos. Autorización: '+displayDate(extension.authorization_date)+
+    (extension.late_days?' ('+extension.late_days+' días después; no desplaza el inicio).':'.')+
+    (extension.authorization_in_future?' Fecha de autorización futura registrada en pruebas.':''):'';
   $('#movement-help').textContent=selected.calculation_mode==='calculated'?'Cada cambio recalcula el historial completo. Retorno hasta el día 90 inclusive; cierre desde el día 91.':'Este expediente tiene fecha manual. Al guardar con el cálculo activado, se validará su historial y se actualizarán el permiso y los recordatorios juntos.';
   $('#movement-calculation-option').hidden=selected.calculation_mode==='calculated';
   const last=history.movements.at(-1);
