@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="csrf-token" content="{{ csrf }}">
-  <title>SERVAMAR | Control de embarcaciones · V99</title>
+  <title>SERVAMAR | Control de embarcaciones · V100</title>
   <link rel="stylesheet" href="/test-assets/postgres-test.css?v=98">
   <script src="/test-assets/postgres-test.js?v=98" defer></script>
 </head>
 <body>
   <div class="test-banner">ENTORNO DE PRUEBAS · SOLO DATOS FICTICIOS · ENVÍOS DESACTIVADOS</div>
-  <header class="topbar"><div class="brand"><div class="mark" aria-hidden="true">⚓</div><div><small>SERVAMAR · CONTROL DE EXPEDIENTES</small><h1>Embarcaciones</h1></div></div><div class="status">V99 · Pruebas</div></header>
+  <header class="topbar"><div class="brand"><div class="mark" aria-hidden="true">⚓</div><div><small>SERVAMAR · CONTROL DE EXPEDIENTES</small><h1>Embarcaciones</h1></div></div><div class="status">V100 · Pruebas</div></header>
   <main>
   <nav class="tabs" aria-label="Secciones principales">
     <button type="button" class="tab active" data-view="inicio" aria-controls="tab-inicio" aria-current="page">Inicio</button>
@@ -25,7 +25,7 @@
     <section class="panel home-control" aria-labelledby="control-title"><div class="section-heading"><h3 id="control-title">Control de vencimientos</h3><span class="scope-badge">Próximos 30 días</span></div><p class="hint">Ordenados por el vencimiento más cercano.</p>
       <div class="tablewrap"><table class="vessel-table"><caption class="sr-only">Vencimientos en los próximos 30 días</caption><thead><tr><th>Embarcación</th><th>Capitán</th><th>Plazo</th><th>Acciones</th></tr></thead><tbody id="expiring-results"><tr><td colspan="4">Cargando vencimientos…</td></tr></tbody></table></div>
     </section>
-    <details class="sv-fold"><summary>Reglas del permiso</summary><p class="fold-body hint">Ingreso: 90 días. Ampliación: 9 meses calendario. Depósito: 12 meses desde su ingreso. El retorno hasta el día 90 inclusive conserva el permiso.</p></details>
+    <details class="sv-fold"><summary>Reglas del permiso</summary><p class="fold-body hint">Ingreso: 90 días. Ampliación: 9 meses calendario desde el último vencimiento, incluidos los retornos; admite autorización posterior. Depósito: 12 meses desde su ingreso. El retorno hasta el día 90 inclusive conserva el permiso.</p></details>
   </div>
   <div id="tab-nuevo" class="view-panel" hidden>
   <section id="editor" class="panel" hidden aria-labelledby="editor-title">
@@ -81,7 +81,7 @@
   <div id="tab-expediente" class="view-panel" hidden>
   <section id="detail" class="panel detail-panel" hidden aria-labelledby="detail-title">
     <div class="section-heading"><h2 id="detail-title" tabindex="-1">Expediente de embarcación</h2><button id="close-detail" type="button" class="secondary">Cerrar</button></div>
-    <div class="vessel-title-bar"><h3 id="detail-name"></h3><p id="last-movement" class="hint"></p></div><p id="permit-summary" class="expiry-banner"></p><details class="sv-fold" open><summary>Historial de movimientos</summary><div class="fold-body" id="movements"></div></details>
+    <div class="vessel-title-bar"><h3 id="detail-name"></h3><p id="last-movement" class="hint"></p></div><p id="permit-summary" class="expiry-banner"></p><p id="extension-basis" class="notice" hidden></p><details class="sv-fold" open><summary>Historial de movimientos</summary><div class="fold-body" id="movements"></div></details>
     <details class="sv-fold contact-fold"><summary>Contactos del expediente</summary><div class="fold-body"><div id="contacts"></div>
     <form id="contact-form"><div class="grid">
       <label>Relación<select name="contact_role"><option value="captain">Capitán</option><option value="owner">Propietario</option><option value="representative">Representante</option><option value="other">Otro</option></select></label>

@@ -26,13 +26,15 @@ def calculate(entry,movements,today=None):
     if entry>today:raise PermitError('El ingreso calculado no puede estar en el futuro')
     stage='ingreso';expiry=entry+timedelta(days=90);cycle_entry=entry
     last_date=entry;departure=None;closed=None;eligible=None;reason=None;added=0;periods=[];last=None
-    marker_seen=False
+    marker_seen=False;extension=None
     ordered=sorted(movements,key=lambda m:(as_date(m['event_date']) if m.get('event_date') else date.min,m.get('id',0)))
     for movement in ordered:
         if not movement.get('event_date'):raise PermitError('Hay un movimiento sin fecha; corrígelo antes de calcular')
         event=as_date(movement['event_date']);kind=movement['kind']
         if event<entry or event<last_date:raise PermitError('Movimiento anterior al ingreso o al historial')
-        if event>today:raise PermitError('Los movimientos calculados no pueden tener fecha futura')
+        # The authorization date is a reference, separate from the extension's
+        # term. Fictional future authorizations are retained and explicitly flagged.
+        if event>today and kind!='ampliacion':raise PermitError('Los movimientos calculados no pueden tener fecha futura')
         last_date=event
         if kind=='ingreso':
             if not marker_seen and last is None and event==entry:
@@ -43,14 +45,19 @@ def calculate(entry,movements,today=None):
                 if stage!='cierre' or not eligible or event<eligible:
                     raise PermitError('Nuevo ingreso requiere permiso cerrado y 90 días cumplidos fuera')
                 cycle_entry=event;expiry=event+timedelta(days=90);stage='ingreso';departure=None
-                closed=None;eligible=None;reason=None;added=0;periods=[];marker_seen=True
+                closed=None;eligible=None;reason=None;added=0;periods=[];marker_seen=True;extension=None
         elif kind in ('ampliacion','deposito'):
-            if stage not in ('ingreso','ampliacion') or event>expiry:
-                raise PermitError('La ampliación o el depósito requiere un permiso vigente dentro del país')
+            if stage not in ('ingreso','ampliacion'):
+                raise PermitError('La ampliación o el depósito requiere un permiso dentro del país, sin cierre ni salida abierta')
             if kind=='ampliacion':
                 if stage!='ingreso':raise PermitError('La ampliación ya fue registrada en este permiso')
+                extension=dict(base_expiry_date=expiry.isoformat(),authorization_date=event.isoformat(),
+                               days_added_before_extension=added,late_days=max((event-expiry).days,0),
+                               authorization_in_future=event>today)
                 expiry=add_months(expiry,9);stage='ampliacion'
+                extension['expiry_date']=expiry.isoformat()
             else:
+                if event>expiry:raise PermitError('El depósito requiere un permiso vigente dentro del país')
                 expiry=add_months(event,12);stage='deposito'
         elif kind=='salida':
             if stage not in ('ingreso','ampliacion'):
@@ -98,7 +105,8 @@ def calculate(entry,movements,today=None):
     return dict(stage=stage,expiry_date=expiry.isoformat(),cycle_start_date=cycle_entry.isoformat(),
                 days_added=added,days_out=min(days_out,90) if days_out is not None else None,
                 closure_date=closed.isoformat() if closed else None,reentry_eligible_date=eligible.isoformat() if eligible else None,
-                closure_reason=reason,plazo=plazo,last_movement=last,needs_review=False,periods=periods,calculation_rule=RULE)
+                closure_reason=reason,plazo=plazo,last_movement=last,needs_review=False,periods=periods,calculation_rule=RULE,
+                extension=extension)
 
 
 def history_for(db,ids):

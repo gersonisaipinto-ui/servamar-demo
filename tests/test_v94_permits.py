@@ -63,7 +63,7 @@ class RuleTests(unittest.TestCase):
         cases=[ [movement('retorno','2026-01-05')],
                 [movement('salida','2026-01-05'),movement('salida','2026-01-06',2)],
                 [movement('ampliacion','2026-02-01'),movement('ampliacion','2026-02-02',2)],
-                [movement('ampliacion','2026-04-02')],
+                [movement('deposito','2026-04-02')],
                 [movement('ingreso','2026-01-02')],
                 [movement('salida','2025-12-31')],
                 [movement('other','2026-01-02')],
@@ -91,6 +91,51 @@ class RuleTests(unittest.TestCase):
     def test_explicit_closure_not_reopened_by_short_return(self):
         with self.assertRaises(permits.PermitError):
             self.project([movement('salida','2026-01-05'),movement('cierre','2026-01-06',2),movement('retorno','2026-01-10',3)])
+
+    def test_late_authorization_keeps_last_expiry_as_term_start(self):
+        for authorization in ('2026-11-15','2026-12-16','2027-09-01'):
+            result=self.project([movement('ampliacion',authorization)],entry=date(2026,8,17))
+            self.assertEqual(result['expiry_date'],'2027-08-15')
+            self.assertEqual(result['extension']['base_expiry_date'],'2026-11-15')
+            self.assertEqual(result['extension']['authorization_date'],authorization)
+        result=self.project([movement('ampliacion','2026-12-16')],entry=date(2026,8,17),today=date(2026,11,21))
+        self.assertEqual(result['extension']['late_days'],31)
+        self.assertTrue(result['extension']['authorization_in_future'])
+        self.assertEqual(result['expiry_date'],'2027-08-15')
+
+    def test_late_extension_includes_all_completed_temporary_exits(self):
+        departure=date(2026,1,5)
+        for days in (0,37,89,90):
+            base=self.entry+timedelta(days=90+days)
+            events=[movement('salida',departure),movement('retorno',departure+timedelta(days=days),2),
+                    movement('ampliacion',base+timedelta(days=31),3)]
+            result=self.project(events)
+            self.assertEqual(result['extension']['base_expiry_date'],base.isoformat())
+            self.assertEqual(result['extension']['days_added_before_extension'],days)
+            self.assertEqual(result['extension']['late_days'],31)
+            self.assertEqual(result['expiry_date'],permits.add_months(base,9).isoformat())
+        events=[movement('salida','2026-01-05'),movement('retorno','2026-02-11',2),
+                movement('salida','2026-03-01',3),movement('retorno','2026-03-06',4),
+                movement('ampliacion','2026-06-01',5)]
+        result=self.project(events)
+        self.assertEqual(result['extension']['base_expiry_date'],'2026-05-13')
+        self.assertEqual(result['expiry_date'],'2027-02-13')
+        self.assertEqual(result['extension']['days_added_before_extension'],42)
+        self.assertEqual(self.project(events),result)
+
+    def test_late_extension_does_not_reopen_closed_or_away_permits(self):
+        for history in ([movement('cierre','2026-02-01')],
+                        [movement('salida','2026-01-05')],
+                        [movement('salida','2026-01-05'),movement('retorno','2026-04-06',2)],
+                        [movement('salida','2026-04-02')],
+                        [movement('deposito','2026-02-01')]):
+            with self.subTest(history=history),self.assertRaises(permits.PermitError):
+                self.project(history+[movement('ampliacion','2026-06-01',3)])
+        # The future-date exception is limited to the recorded authorization.
+        for kind in ('salida','retorno','deposito','cierre','ingreso'):
+            with self.subTest(kind=kind),self.assertRaises(permits.PermitError):
+                self.project([movement(kind,'2026-12-16')],entry=date(2026,8,17),today=date(2026,11,21))
+
 
 
 @unittest.skipUnless(os.getenv('V90_TEST_POSTGRES_URL'),'Requires isolated PostgreSQL')
@@ -260,7 +305,7 @@ class CalculatedDatabaseTests(support.FunctionalTests):
     def test_preview_invalid_history_ownership_version_and_options(self):
         vessel=self.create(start_date='04/11/2026')
         path=self.path(vessel)+'/movements'
-        body=dict(version=vessel['version'],kind='ampliacion',event_date='18/11/2026',apply_calculation=True)
+        body=dict(version=vessel['version'],kind='deposito',event_date='18/11/2026',apply_calculation=True)
         for suffix in ('/preview',''):
             self.assertEqual(self.request('POST',path+suffix,body).status_code,409)
             self.assertEqual(self.request('POST',path+suffix,dict(body,apply_calculation='true')).status_code,400)
@@ -268,11 +313,64 @@ class CalculatedDatabaseTests(support.FunctionalTests):
         self.assertEqual(self.request('POST',path+'/preview',dict(body,movement_id=True)).status_code,400)
         self.assertEqual(self.request('POST',path+'/preview',dict(body,movement_id=999999)).status_code,404)
         self.assertEqual(self.request('GET',self.path(vessel)).json['vessel'],vessel)
-        vessel,_=self.add(vessel,'ampliacion','12/12/2026')
+        vessel,_=self.add(vessel,'salida','12/12/2026')
         # Preserve historical rows for correction; never silently discard or re-date them.
         response=self.request('POST',path+'/preview',dict(body,version=vessel['version'],event_date='10/11/2026'))
         self.assertEqual(response.status_code,409,response.json)
         self.assertEqual(self.request('GET',self.path(vessel)).json['vessel'],vessel)
+
+
+    def test_confirmed_legacy_extension_preserves_both_dates_and_calculates(self):
+        vessel=self.create(start_date='17/08/2026',expiry_date='')
+        vessel,mid=self.add(vessel,'ampliacion','16/12/2026')
+        body=dict(version=vessel['version'],kind='ampliacion',event_date='16/12/2026',apply_calculation=True,movement_id=mid)
+        path=self.path(vessel)+'/movements'
+        preview=self.request('POST',path+'/preview',body)
+        self.assertEqual(preview.status_code,200,preview.json)
+        self.assertIn('15/11/2026 + 9 meses calendario = 15/08/2027',preview.json['projection']['explanation'])
+        self.assertIn('Fecha de autorización futura',preview.json['projection']['explanation'])
+        response=self.request('PUT',path+'/'+str(mid),body)
+        self.assertEqual(response.status_code,200,response.json);vessel=response.json['vessel']
+        self.assertEqual(vessel['expiry_date'],'2027-08-15')
+        self.assertEqual(vessel['start_date'],'2026-08-17')
+        self.assertEqual(vessel['extension']['authorization_date'],'2026-12-16')
+        self.assertEqual(vessel['extension']['base_expiry_date'],'2026-11-15')
+        self.assertEqual(len(self.request('GET',path).json['movements']),1)
+        plan=self.request('GET',self.path(vessel)+'/notifications/plan').json
+        self.assertFalse(plan['delivery_enabled'])
+        self.assertEqual({p['date'] for p in plan['plans'] if p['status']=='planned'}, {'2027-07-16','2027-07-31','2027-08-14'})
+
+    def test_late_extension_replays_corrected_return_and_replans_reminders(self):
+        vessel=self.create(start_date='17/08/2026',expiry_date='',calculation_mode='calculated')
+        vessel,_=self.add(vessel,'salida','20/08/2026')
+        vessel,returned=self.add(vessel,'retorno','26/09/2026')
+        self.assertEqual(vessel['expiry_date'],'2026-12-22')
+        vessel,extension=self.add(vessel,'ampliacion','15/01/2027')
+        self.assertEqual(vessel['expiry_date'],'2027-09-22')
+        self.assertEqual(vessel['extension']['days_added_before_extension'],37)
+        plan_path=self.path(vessel)+'/notifications/plan'
+        response=self.request('PUT',self.path(vessel)+'/movements/'+str(returned),
+                              dict(version=vessel['version'],kind='retorno',event_date='27/09/2026'))
+        self.assertEqual(response.status_code,200,response.json);vessel=response.json['vessel']
+        self.assertEqual(vessel['extension']['base_expiry_date'],'2026-12-23')
+        self.assertEqual(vessel['expiry_date'],'2027-09-23')
+        plans=self.request('GET',plan_path).json['plans']
+        self.assertTrue(all(p['status']=='cancelled' for p in plans if p['expiry_date'] in ('2026-12-22','2027-09-22')))
+        self.assertEqual({p['date'] for p in plans if p['status']=='planned'},{'2027-08-24','2027-09-08','2027-09-22'})
+        # Changing the authorization date leaves the same base and does not double-add absence days.
+        response=self.request('PUT',self.path(vessel)+'/movements/'+str(extension),
+                              dict(version=vessel['version'],kind='ampliacion',event_date='16/01/2027'))
+        self.assertEqual(response.status_code,200,response.json);vessel=response.json['vessel']
+        self.assertEqual(vessel['expiry_date'],'2027-09-23')
+        self.assertEqual(vessel['days_added'],38)
+        self.assertEqual(self.request('GET',plan_path).json['plans'],plans)
+        response=self.request('DELETE',self.path(vessel)+'/movements/'+str(extension),
+                              dict(version=vessel['version'],confirm_declaration=vessel['declaration']))
+        self.assertEqual(response.status_code,200,response.json)
+        self.assertEqual(response.json['vessel']['expiry_date'],'2026-12-23')
+        self.assertIsNone(response.json['vessel']['extension'])
+        plans=self.request('GET',plan_path).json['plans']
+        self.assertTrue(all(p['expiry_date']=='2026-12-23' for p in plans if p['status']=='planned'))
 
 
 if __name__=='__main__':unittest.main()

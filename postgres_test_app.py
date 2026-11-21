@@ -1,4 +1,4 @@
-"""SERVAMAR V99: independent fictional PostgreSQL console. Never imports app.py."""
+"""SERVAMAR V100: independent fictional PostgreSQL console. Never imports app.py."""
 import hashlib
 import hmac
 import os
@@ -199,7 +199,7 @@ def security_headers(response):
 
 @app.get('/healthz')
 def health():
-    return jsonify(service='servamar-postgres-test', version='V99', calculations_enabled=True, notifications_enabled=False, configured=configured())
+    return jsonify(service='servamar-postgres-test', version='V100', calculations_enabled=True, notifications_enabled=False, configured=configured())
 
 
 @app.get('/')
